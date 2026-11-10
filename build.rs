@@ -141,11 +141,17 @@ fn bitmap(size: usize, rgba: &[[f32; 4]]) -> Vec<u8> {
     image
 }
 
-/// Phantom Switch's icon, RGBA from 0 to 1 top to bottom, with 4 × 4 samples per pixel.
+/// Phantom Switch's icon: a ghost shaped like a mouse (the seam between its buttons and its wheel
+/// on top, a ghost's wavy hem below) on a rounded square in an indigo gradient. RGBA from 0 to 1,
+/// top to bottom, with 4 × 4 samples per pixel.
 fn brand(size: usize) -> Vec<[f32; 4]> {
     let n = size as f32;
     let top_left = [0.39, 0.40, 0.95];
     let bottom_right = [0.42, 0.16, 0.85];
+    // Below 32 px the seam and the wheel would be a smudge: the ghost keeps its eyes.
+    let details = size >= 32;
+    // The seam is at least a pixel wide.
+    let seam = (0.6 / n).max(0.009);
     let mut pixels = vec![[0.0; 4]; size * size];
     for y in 0..size {
         for x in 0..size {
@@ -160,12 +166,23 @@ fn brand(size: usize) -> Vec<[f32; 4]> {
                     let t = (px + py) / 2.0;
                     let mut color: [f32; 3] =
                         std::array::from_fn(|i| top_left[i] + (bottom_right[i] - top_left[i]) * t);
-                    // The switch: its translucent track and the knob, on to the right.
-                    if rounded_box(px - 0.5, py - 0.5, 0.29, 0.155, 0.155) <= 0.0 {
-                        color = color.map(|c| c + (1.0 - c) * 0.32);
+                    // A soft shadow under the ghost, as if it floated.
+                    let below = ((px - 0.5) / 0.2).hypot((py - 0.845) / 0.03);
+                    if details && below < 1.0 {
+                        color = color.map(|c| c * (1.0 - 0.3 * (1.0 - below)));
                     }
-                    if (px - 0.635).hypot(py - 0.5) <= 0.115 {
+                    if ghost(px, py) {
                         color = [1.0, 1.0, 1.0];
+                        let eye = |cx: f32| ((px - cx) / 0.04).hypot((py - 0.47) / 0.055) <= 1.0;
+                        if eye(0.415) || eye(0.585) {
+                            color = [0.12, 0.11, 0.29];
+                        }
+                        if details && (px - 0.5).abs() <= seam && py <= 0.37 {
+                            color = [0.62, 0.65, 0.97];
+                        }
+                        if details && rounded_box(px - 0.5, py - 0.29, 0.024, 0.048, 0.024) <= 0.0 {
+                            color = [0.45, 0.47, 0.92];
+                        }
                     }
                     for i in 0..3 {
                         sum[i] += color[i];
@@ -182,6 +199,28 @@ fn brand(size: usize) -> Vec<[f32; 4]> {
         }
     }
     pixels
+}
+
+/// Whether (`x`, `y`), from 0 to 1, falls inside the ghost: a dome on top (the mouse's front),
+/// straight sides, and three scallops hanging from its hem.
+fn ghost(x: f32, y: f32) -> bool {
+    const LEFT: f32 = 0.27;
+    const RIGHT: f32 = 0.73;
+    const DOME: f32 = 0.42;
+    const HEM: f32 = 0.7;
+    let half = (RIGHT - LEFT) / 2.0;
+    if y < DOME {
+        return (x - 0.5).hypot(y - DOME) <= half;
+    }
+    if !(LEFT..=RIGHT).contains(&x) {
+        return false;
+    }
+    if y <= HEM {
+        return true;
+    }
+    let bump = (RIGHT - LEFT) / 6.0;
+    let scallop = ((x - LEFT) / (2.0 * bump)).floor().clamp(0.0, 2.0);
+    (x - (LEFT + bump * (2.0 * scallop + 1.0))).hypot(y - HEM) <= bump
 }
 
 /// Signed distance to a rounded box centered at the origin (negative inside).

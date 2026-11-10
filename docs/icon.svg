@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Phantom Switch</title>
+  <!-- The same drawing as the .exe's icon (build.rs): a ghost shaped like a mouse. -->
+  <defs>
+    <linearGradient id="square" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366f2"/>
+      <stop offset="1" stop-color="#6b29d9"/>
+    </linearGradient>
+    <radialGradient id="shadow">
+      <stop offset="0" stop-color="#000" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="7.68" y="7.68" width="240.64" height="240.64" rx="56.32" fill="url(#square)"/>
+  <ellipse cx="128" cy="216.32" rx="51.2" ry="7.68" fill="url(#shadow)"/>
+  <path d="M 69.12 107.52 A 58.88 58.88 0 0 1 186.88 107.52 L 186.88 179.2 A 19.63 19.63 0 0 1 147.63 179.2 A 19.63 19.63 0 0 1 108.37 179.2 A 19.63 19.63 0 0 1 69.12 179.2 Z" fill="#fff"/>
+  <rect x="125.7" y="49" width="4.6" height="45.7" fill="#9ea6f7"/>
+  <rect x="121.86" y="61.95" width="12.28" height="24.58" rx="6.14" fill="#7378eb"/>
+  <ellipse cx="106.24" cy="120.32" rx="10.24" ry="14.08" fill="#1f1c4a"/>
+  <ellipse cx="149.76" cy="120.32" rx="10.24" ry="14.08" fill="#1f1c4a"/>
+</svg>

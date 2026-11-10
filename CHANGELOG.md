@@ -4,6 +4,16 @@ All notable changes to Phantom Switch. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/). Each release's notes on GitHub are its section here.
 
+## [0.3.1] - 2026-11-10
+
+### Changed
+
+- A new icon for the app: a ghost shaped like a mouse, the seam between its buttons and its wheel on top and a ghost's wavy hem below, on an indigo gradient. The tray icon still shows the active profile's number.
+
+### Note
+
+This is a pre-release: every read is verified on a real ATK Phantom Ultimate (BITMOUSE firmware), wired and through its 8K receiver, but switching from the app is not yet.
+
 ## [0.3.0] - 2026-11-10
 
 ### Added
@@ -50,6 +60,7 @@ Pre-release: every read is verified on a real ATK Phantom Ultimate (BITMOUSE fir
 
 Pre-release: every read is verified on a real ATK Phantom Ultimate (BITMOUSE firmware), wired and through its 8K receiver, but switching from the app is not yet.
 
+[0.3.1]: https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases/tag/v0.3.1
 [0.3.0]: https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases/tag/v0.3.0
 [0.2.0]: https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases/tag/v0.2.0
 [0.1.0]: https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases/tag/v0.1.0

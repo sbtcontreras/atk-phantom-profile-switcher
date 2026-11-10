@@ -1,6 +1,6 @@
 [package]
 name = "atk-phantom-profile-switcher"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 description = "Phantom Switch: switch the ATK Phantom Ultimate's onboard profiles from the Windows tray."
 license = "MIT"

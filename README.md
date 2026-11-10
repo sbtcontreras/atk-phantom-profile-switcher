@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/icon.svg" alt="Phantom Switch icon: a ghost shaped like a mouse" width="112">
+
 # Phantom Switch
 
 **Your ATK Phantom's profiles, one click from the clock.**
