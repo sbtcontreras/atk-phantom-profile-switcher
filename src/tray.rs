@@ -1,4 +1,4 @@
-//! El ícono junto al reloj: ponerlo, cambiarlo, quitarlo y mostrar notificaciones desde él.
+//! The icon next to the clock: adding, changing and removing it, and notifications from it.
 
 use std::mem::{size_of, zeroed};
 
@@ -10,23 +10,18 @@ use windows_sys::Win32::UI::Shell::{
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::SM_CXSMICON;
 
-use crate::icon::{self, Icon, Rgb};
+use crate::badge;
+use crate::device::Slot;
+use crate::paint::Icon;
 use crate::win::fill;
-
-/// Cómo se ve el ícono.
-pub struct Look {
-    pub label: String,
-    pub color: Rgb,
-    pub tooltip: String,
-}
 
 pub struct Tray {
     window: HWND,
-    /// El mensaje con el que llegan los clics y las teclas sobre el ícono.
+    /// The message that brings clicks and keys on the icon.
     message: u32,
-    /// El ícono que muestra la bandeja: vive hasta que lo reemplaza otro.
+    /// The icon the tray shows: it lives until another replaces it.
     icon: Option<Icon>,
-    /// Si la bandeja lo tiene (el Explorador lo olvida al reiniciarse).
+    /// Whether the tray has it (Explorer forgets it when it restarts).
     added: bool,
 }
 
@@ -35,19 +30,20 @@ impl Tray {
         Tray { window, message, icon: None, added: false }
     }
 
-    pub fn show(&mut self, look: &Look) {
+    /// Shows the badge of `slot` (a question mark when unknown) with `tooltip`.
+    pub fn show(&mut self, slot: Option<Slot>, tooltip: &str) {
         let mut data = self.data();
         data.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP;
         data.uCallbackMessage = self.message;
-        let icon = icon::badge(&look.label, look.color, self.icon_size());
+        let icon = badge::draw(slot, self.icon_size()).icon();
         data.hIcon = icon.as_ref().map_or(std::ptr::null_mut(), Icon::handle);
-        fill(&mut data.szTip, &look.tooltip);
-        // SAFETY: `data` está completo y su ícono vive hasta que lo reemplaza el siguiente.
+        fill(&mut data.szTip, tooltip);
+        // SAFETY: `data` is complete, and its icon lives until the next one replaces it.
         unsafe {
             if !self.added || Shell_NotifyIconW(NIM_MODIFY, &data) == 0 {
                 self.added = Shell_NotifyIconW(NIM_ADD, &data) != 0;
-                // La versión 4: clic y teclado como en el resto de Windows (NIN_SELECT,
-                // WM_CONTEXTMENU con la posición del ícono).
+                // Version 4: clicks and keys as everywhere else in Windows (NIN_SELECT, and
+                // WM_CONTEXTMENU with the icon's position).
                 data.Anonymous.uVersion = NOTIFYICON_VERSION_4;
                 Shell_NotifyIconW(NIM_SETVERSION, &data);
             }
@@ -55,7 +51,7 @@ impl Tray {
         self.icon = icon;
     }
 
-    /// El Explorador se reinició: la bandeja ya no tiene el ícono.
+    /// Explorer restarted: the tray no longer has the icon.
     pub fn forget(&mut self) {
         self.added = false;
     }
@@ -66,28 +62,29 @@ impl Tray {
         data.dwInfoFlags = NIIF_WARNING | NIIF_RESPECT_QUIET_TIME;
         fill(&mut data.szInfoTitle, title);
         fill(&mut data.szInfo, body);
-        // SAFETY: `data` está completo.
+        // SAFETY: `data` is complete.
         unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) };
     }
 
     pub fn remove(&mut self) {
-        // SAFETY: `data` identifica el ícono de esta ventana.
+        // SAFETY: `data` names this window's icon.
         unsafe { Shell_NotifyIconW(NIM_DELETE, &self.data()) };
         self.added = false;
     }
 
+    /// The side of a small icon at the screen's scaling: 16 px at 100 %, 24 at 150 %…
+    pub fn icon_size(&self) -> usize {
+        // SAFETY: the window is this program's.
+        let side = unsafe { GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForWindow(self.window)) };
+        usize::try_from(side).unwrap_or(16).clamp(16, 256)
+    }
+
     fn data(&self) -> NOTIFYICONDATAW {
-        // SAFETY: NOTIFYICONDATAW es datos planos; en cero es su estado inicial.
+        // SAFETY: NOTIFYICONDATAW is plain data; all zeros is its initial state.
         let mut data: NOTIFYICONDATAW = unsafe { zeroed() };
         data.cbSize = size_of::<NOTIFYICONDATAW>() as u32;
         data.hWnd = self.window;
         data.uID = 1;
         data
-    }
-
-    /// El lado de un ícono chico al escalado de la pantalla: 16 px al 100 %, 24 al 150 %…
-    fn icon_size(&self) -> i32 {
-        // SAFETY: la ventana es de este programa.
-        unsafe { GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForWindow(self.window)) }
     }
 }

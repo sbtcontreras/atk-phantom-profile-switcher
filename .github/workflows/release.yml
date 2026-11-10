@@ -1,6 +1,6 @@
-# Al subir una etiqueta vX.Y.Z (anotada: su mensaje son las notas de la versión), compila el .exe
-# en Windows desde este código, corre las pruebas y lo publica en Releases con su SHA-256.
-# Las versiones 0.x salen como pre-release.
+# Pushing a tag vX.Y.Z builds the .exe on Windows from this code, runs the tests and publishes it
+# on Releases with its SHA-256. The release notes are that version's section of CHANGELOG.md.
+# 0.x versions are published as pre-releases.
 name: Release
 
 on:
@@ -16,38 +16,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # checkout deja la etiqueta como una referencia simple, sin su mensaje: sin traerla, las
-      # notas serían el mensaje del commit.
-      - name: Notas de la versión
+      - name: Version and release notes
         shell: bash
         run: |
-          git fetch --no-tags --depth=1 --force origin "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
-          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" != "tag" ]; then
-            echo "La etiqueta $GITHUB_REF_NAME no es anotada: su mensaje son las notas de la versión."
+          version="${GITHUB_REF_NAME#v}"
+          if [ "$version" != "$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match the version in Cargo.toml."
             exit 1
           fi
-          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+          awk -v version="$version" '
+            index($0, "## [" version "]") == 1 { found = 1; next }
+            found && (/^## \[/ || /^\[[0-9]/) { exit }
+            found { print }
+          ' CHANGELOG.md | sed -e '/./,$!d' > "$RUNNER_TEMP/notes.md"
+          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then
+            echo "CHANGELOG.md has no section for $version."
+            exit 1
+          fi
           cat "$RUNNER_TEMP/notes.md"
 
-      - name: Rust estable
+      - name: Stable Rust
         run: rustup update stable && rustup default stable
 
-      - name: La etiqueta coincide con Cargo.toml
-        shell: bash
-        run: |
-          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "La etiqueta $GITHUB_REF_NAME no coincide con la versión $version de Cargo.toml."
-            exit 1
-          fi
-
-      - name: Pruebas
+      - name: Tests
         run: cargo test
 
-      - name: Compilar
+      - name: Build
         run: cargo build --release
 
-      - name: Publicar
+      - name: Publish
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -57,4 +54,4 @@ jobs:
           prerelease=""
           case "$GITHUB_REF_NAME" in v0.*) prerelease="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" PhantomSwitch.exe PhantomSwitch.exe.sha256 \
-            --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" $prerelease
+            --title "Phantom Switch ${GITHUB_REF_NAME}" --notes-file "$RUNNER_TEMP/notes.md" $prerelease

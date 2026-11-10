@@ -1,5 +1,5 @@
-//! El ATK Phantom Ultimate: encontrarlo, leer lo que tiene y cambiar de configuración. Todo
-//! lo que le pide es lectura, salvo `Phantom::activate`.
+//! The ATK Phantom Ultimate: finding it, reading what it has and switching profiles. All it is
+//! asked is a read, but `Phantom::activate`.
 
 mod hid;
 mod protocol;
@@ -9,16 +9,16 @@ use std::time::Duration;
 use protocol::{FEATURE_FPS_13K, REPORT_ID, Request, Route};
 pub use protocol::{Sensor, Slot};
 
-/// Fabricantes de las interfaces de ATK.
+/// Vendors of ATK's interfaces.
 const VENDORS: [u16; 2] = [0x373B, 0x3554];
-/// La interfaz de órdenes de los mouse BITMOUSE: página de uso y uso.
+/// The command interface of BITMOUSE mice: usage page and usage.
 const INTERFACE: (u16, u16) = (0xFF05, 1);
-/// El Phantom por cable; cualquier otro producto con esa interfaz es un receptor.
+/// The wired Phantom; any other product with that interface is a receiver.
 const WIRED: [u16; 2] = [4814, 4882];
-/// Lo que se espera una respuesta (el receptor tarda más que el cable).
+/// How long an answer is waited for (the receiver takes longer than the cable).
 const ANSWER_WAIT: Duration = Duration::from_millis(1500);
 
-/// El mouse dejó de responder a la conexión: se desconectó o se apagó el receptor.
+/// The mouse's connection stopped answering: it was unplugged or its receiver went away.
 #[derive(Debug)]
 pub struct Disconnected;
 
@@ -36,16 +36,16 @@ pub struct Battery {
     pub charging: bool,
 }
 
-/// Lo que tiene una configuración.
+/// What a profile has.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct Profile {
     pub polling_hz: Option<u32>,
-    /// DPI horizontal y vertical del nivel activo.
+    /// Horizontal and vertical DPI of the active level.
     pub dpi: Option<(u16, u16)>,
     pub sensor: Option<Sensor>,
 }
 
-/// Lo que se lee del mouse en un momento.
+/// What is read from the mouse at one moment.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Snapshot {
     pub slot: Slot,
@@ -56,13 +56,13 @@ pub struct Snapshot {
 pub struct Phantom {
     link: hid::Link,
     route: Route,
-    /// Si el modo del sensor está en la memoria de la configuración (según las funciones del
-    /// mouse, preguntadas una vez por conexión).
+    /// Whether the sensor mode is in the profile's memory (from the mouse's features, asked once
+    /// per connection).
     sensor_in_memory: Option<bool>,
 }
 
 impl Phantom {
-    /// La primera interfaz ATK que responde cuál es su configuración activa.
+    /// The first ATK interface that answers which profile is active.
     pub fn find() -> Option<Phantom> {
         hid::interfaces()
             .into_iter()
@@ -82,17 +82,17 @@ impl Phantom {
         }
     }
 
-    /// La configuración activa, o `None` si el mouse no contestó.
+    /// The active profile, or `None` if the mouse did not answer.
     pub fn active_slot(&mut self) -> Result<Option<Slot>> {
         Ok(self.ask(Request::Active)?.and_then(|data| protocol::active(&data)).map(|(slot, _)| slot))
     }
 
-    /// Activa `slot`; `false` si el mouse no lo confirmó.
+    /// Activates `slot`; `false` if the mouse did not confirm it.
     pub fn activate(&mut self, slot: Slot) -> Result<bool> {
         Ok(self.ask(Request::Activate(slot))?.is_some())
     }
 
-    /// La configuración activa con lo que tiene, y la batería; `None` si el mouse no contestó.
+    /// The active profile with what it has, and the battery; `None` if the mouse did not answer.
     pub fn snapshot(&mut self) -> Result<Option<Snapshot>> {
         let Some((slot, polling_hz)) = self.ask(Request::Active)?.and_then(|data| protocol::active(&data)) else {
             return Ok(None);
@@ -101,7 +101,7 @@ impl Phantom {
         Ok(Some(Snapshot { slot, profile, battery: self.battery()? }))
     }
 
-    /// La batería, o `None` si el mouse no contestó.
+    /// The battery, or `None` if the mouse did not answer.
     pub fn battery(&mut self) -> Result<Option<Battery>> {
         let Some(percent) = self.ask(Request::Battery)?.and_then(|data| data.first().copied()) else {
             return Ok(None);
@@ -110,13 +110,13 @@ impl Phantom {
         Ok(Some(Battery { percent, charging }))
     }
 
-    /// El DPI del nivel activo: el nivel en la tabla, y luego solo su entrada.
+    /// The DPI of the active level: the level in the table, then only its entry.
     fn dpi(&mut self) -> Result<Option<(u16, u16)>> {
         let Some(level) = self.read_memory(protocol::DPI_TABLE, 1)? else { return Ok(None) };
         Ok(self.read_memory(protocol::dpi_entry(level[0]), 4)?.and_then(|entry| protocol::dpi(&entry)))
     }
 
-    /// El modo del sensor; `None` si no se sabe leerlo en este mouse.
+    /// The sensor mode; `None` when this mouse keeps it somewhere this app does not know.
     fn sensor(&mut self) -> Result<Option<Sensor>> {
         if self.sensor_in_memory.is_none() {
             let features = self.ask(Request::Features)?.and_then(|data| data.first().copied());
@@ -133,7 +133,7 @@ impl Phantom {
         Ok(data.and_then(|data| protocol::memory(&data, len).map(<[u8]>::to_vec)))
     }
 
-    /// Hace un pedido y devuelve los datos de su respuesta.
+    /// Makes a request and returns its answer's data.
     fn ask(&mut self, request: Request) -> Result<Option<Vec<u8>>> {
         let packet = request.packet(self.route);
         let report = self.link.exchange(REPORT_ID, &packet, ANSWER_WAIT, |r| request.answer(r).is_some())?;

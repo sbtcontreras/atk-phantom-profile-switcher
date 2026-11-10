@@ -1,4 +1,4 @@
-//! Lo que pide cualquier parte que habla con Windows.
+//! What any part that talks to Windows needs.
 
 use std::os::windows::io::{FromRawHandle, OwnedHandle};
 use std::ptr::{null, null_mut};
@@ -8,14 +8,14 @@ use windows_sys::Win32::System::Threading::CreateMutexW;
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MB_ICONINFORMATION, MB_OK, MessageBoxW, SW_SHOWNORMAL};
 
-use crate::strings;
+use crate::strings::APP_NAME;
 
-/// `text` en UTF-16 terminado en 0.
+/// `text` as NUL-terminated UTF-16.
 pub fn wide(text: &str) -> Vec<u16> {
     text.encode_utf16().chain(Some(0)).collect()
 }
 
-/// Copia `text` en un campo de texto de largo fijo de Windows, recortado y terminado en 0.
+/// Copies `text` into a fixed-length Windows text field, cut short and NUL-terminated.
 pub fn fill(field: &mut [u16], text: &str) {
     let room = field.len().saturating_sub(1);
     let units: Vec<u16> = text.encode_utf16().take(room).collect();
@@ -23,12 +23,12 @@ pub fn fill(field: &mut [u16], text: &str) {
     field[units.len()..].fill(0);
 }
 
-/// Una sola copia abierta a la vez: mientras exista, otra copia no la consigue.
-pub struct SingleInstance(#[expect(dead_code, reason = "se guarda solo para mantener el mutex")] OwnedHandle);
+/// One running copy at a time: while it exists, another copy cannot get it.
+pub struct SingleInstance(#[expect(dead_code, reason = "kept only to hold the mutex")] OwnedHandle);
 
 impl SingleInstance {
     pub fn acquire(name: &str) -> Option<SingleInstance> {
-        // SAFETY: crea (o abre) un mutex con nombre; el handle queda en un `OwnedHandle`.
+        // SAFETY: creates (or opens) a named mutex; the handle goes into an `OwnedHandle`.
         let (handle, existed) = unsafe {
             let handle = CreateMutexW(null(), 1, wide(name).as_ptr());
             (handle, GetLastError() == ERROR_ALREADY_EXISTS)
@@ -36,22 +36,22 @@ impl SingleInstance {
         if handle.is_null() {
             return None;
         }
-        // SAFETY: un handle válido recién creado y de nadie más.
+        // SAFETY: a valid handle just created, owned by nobody else.
         let handle = unsafe { OwnedHandle::from_raw_handle(handle) };
         (!existed).then_some(SingleInstance(handle))
     }
 }
 
 pub fn message(text: &str) {
-    // SAFETY: cadenas terminadas en 0 que viven durante la llamada.
+    // SAFETY: NUL-terminated strings that live through the call.
     unsafe {
-        MessageBoxW(null_mut(), wide(text).as_ptr(), wide(strings::APP_NAME).as_ptr(), MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(null_mut(), wide(text).as_ptr(), wide(APP_NAME).as_ptr(), MB_OK | MB_ICONINFORMATION);
     }
 }
 
-/// Abre `url` en el navegador predeterminado.
+/// Opens `url` in the default browser.
 pub fn open_url(url: &str) {
-    // SAFETY: cadenas terminadas en 0 que viven durante la llamada.
+    // SAFETY: NUL-terminated strings that live through the call.
     unsafe {
         ShellExecuteW(null_mut(), wide("open").as_ptr(), wide(url).as_ptr(), null(), null(), SW_SHOWNORMAL);
     }

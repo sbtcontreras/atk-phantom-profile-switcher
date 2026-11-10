@@ -1,8 +1,8 @@
 [package]
 name = "atk-phantom-profile-switcher"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
-description = "Phantom Switch: cambia las configuraciones del ATK Phantom Ultimate desde la bandeja de Windows."
+description = "Phantom Switch: switch the ATK Phantom Ultimate's onboard profiles from the Windows tray."
 license = "MIT"
 repository = "https://github.com/sbtcontreras/atk-phantom-profile-switcher"
 publish = false
@@ -15,6 +15,7 @@ path = "src/main.rs"
 windows-sys = { version = "0.61", features = [
   "Win32_Devices_DeviceAndDriverInstallation",
   "Win32_Devices_HumanInterfaceDevice",
+  "Win32_Globalization",
   "Win32_Graphics_Gdi",
   "Win32_Security",
   "Win32_Storage_FileSystem",

@@ -1,20 +1,24 @@
-//! Phantom Switch: cambia la configuración interna (onboard) del ATK Phantom Ultimate desde un
-//! ícono junto al reloj de Windows, con los mismos comandos que ATK HUB.
+//! Phantom Switch: switches the onboard profiles of the ATK Phantom Ultimate from an icon next
+//! to the Windows clock, with the same commands ATK HUB uses.
 //!
-//! - `device`: el mouse (su protocolo, aparte de la E/S de Windows, para probarlo).
-//! - `worker`: el hilo que le habla al mouse; la interfaz nunca espera al mouse.
-//! - `app`: la interfaz y lo que se sabe del mouse; `tray`, `menu` e `icon` la dibujan.
+//! - `device`: the mouse (its protocol apart from Windows' I/O, so it can be tested).
+//! - `worker`: the thread that talks to the mouse; the interface never waits for it.
+//! - `app`: the interface and what is known of the mouse; `tray`, `menu` and `overlay` show it,
+//!   all drawn with `paint` and `badge`.
 //!
-//! No escucha el mouse ni el teclado: le habla solo cuando se le pide, cuando Windows avisa que
-//! se conectó o desconectó algo y, por el receptor, para la batería cada 15 minutos.
+//! It never listens to the mouse or the keyboard: it talks to the mouse only when asked, when
+//! Windows says something was plugged in or out, and, through the receiver, for the battery every
+//! 15 minutes.
 
 #![windows_subsystem = "windows"]
 
 mod app;
+mod badge;
 mod device;
-mod icon;
 mod menu;
-mod startup;
+mod overlay;
+mod paint;
+mod settings;
 mod strings;
 mod theme;
 mod tray;
@@ -23,7 +27,7 @@ mod worker;
 
 fn main() {
     let Some(_instance) = win::SingleInstance::acquire("PhantomSwitch") else {
-        win::message(strings::ALREADY_RUNNING);
+        win::message(strings::ui().already_running());
         return;
     };
     theme::follow_system();

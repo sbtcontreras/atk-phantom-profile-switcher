@@ -1,12 +1,12 @@
-//! Los recursos del `.exe`: su ícono, su información de versión y su manifiesto (escalado por
-//! monitor, controles modernos). El ícono se dibuja aquí mismo, así que el repositorio no lleva
-//! imágenes: un cuadrado redondeado en degradado índigo con un interruptor blanco.
+//! The `.exe`'s resources: its icon, its version information and its manifest (per-monitor
+//! scaling, modern controls). The icon is drawn right here, so the repository carries no images:
+//! a rounded square in an indigo gradient with a white toggle switch.
 
 use std::error::Error;
 use std::path::Path;
 use std::{env, fs};
 
-/// Los lados del ícono del `.exe`: de la bandeja de archivos a los íconos grandes del Explorador.
+/// The sides of the `.exe`'s icon: from file lists to Explorer's large icons.
 const SIZES: [usize; 8] = [16, 20, 24, 32, 40, 48, 64, 128];
 
 const MANIFEST: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -56,11 +56,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn resources(out: &Path) -> Result<String, Box<dyn Error>> {
-    // En una cadena de un .rc, la barra invertida escapa: las rutas de Windows la llevan doble.
+    // In an .rc string, a backslash escapes: Windows paths need it doubled.
     let path = |file: &str| out.join(file).display().to_string().replace('\\', "\\\\");
     let version = env::var("CARGO_PKG_VERSION")?;
     let numbers: Vec<&str> = version.split(['.', '-']).take(3).collect();
-    let [major, minor, patch] = numbers[..] else { return Err("la versión no es X.Y.Z".into()) };
+    let [major, minor, patch] = numbers[..] else { return Err("the version is not X.Y.Z".into()) };
     let repository = env::var("CARGO_PKG_REPOSITORY")?;
     Ok(format!(
         r#"1 ICON "{icon}"
@@ -73,7 +73,7 @@ FILETYPE 0x1
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
-    BLOCK "0c0a04b0"
+    BLOCK "040904b0"
     BEGIN
       VALUE "CompanyName", "sbtcontreras"
       VALUE "FileDescription", "Phantom Switch"
@@ -87,7 +87,7 @@ BEGIN
   END
   BLOCK "VarFileInfo"
   BEGIN
-    VALUE "Translation", 0x0c0a, 1200
+    VALUE "Translation", 0x0409, 1200
   END
 END
 "#,
@@ -96,7 +96,7 @@ END
     ))
 }
 
-/// Un .ico con un mapa de bits de 32 bits por tamaño.
+/// An .ico with a 32-bit bitmap per size.
 fn ico() -> Vec<u8> {
     let images: Vec<Vec<u8>> = SIZES.iter().map(|size| bitmap(*size, &brand(*size))).collect();
     let mut file = Vec::new();
@@ -118,7 +118,7 @@ fn ico() -> Vec<u8> {
     file
 }
 
-/// La imagen de un .ico: su cabecera, los píxeles BGRA de abajo arriba y una máscara vacía.
+/// An .ico image: its header, BGRA pixels bottom to top and an empty mask.
 fn bitmap(size: usize, rgba: &[[f32; 4]]) -> Vec<u8> {
     let mask_row = size.div_ceil(32) * 4;
     let mut image = Vec::new();
@@ -141,7 +141,7 @@ fn bitmap(size: usize, rgba: &[[f32; 4]]) -> Vec<u8> {
     image
 }
 
-/// El ícono de Phantom Switch, RGBA de 0 a 1 de arriba abajo, con 4 × 4 muestras por píxel.
+/// Phantom Switch's icon, RGBA from 0 to 1 top to bottom, with 4 × 4 samples per pixel.
 fn brand(size: usize) -> Vec<[f32; 4]> {
     let n = size as f32;
     let top_left = [0.39, 0.40, 0.95];
@@ -160,7 +160,7 @@ fn brand(size: usize) -> Vec<[f32; 4]> {
                     let t = (px + py) / 2.0;
                     let mut color: [f32; 3] =
                         std::array::from_fn(|i| top_left[i] + (bottom_right[i] - top_left[i]) * t);
-                    // El interruptor: su riel translúcido y la perilla, encendida a la derecha.
+                    // The switch: its translucent track and the knob, on to the right.
                     if rounded_box(px - 0.5, py - 0.5, 0.29, 0.155, 0.155) <= 0.0 {
                         color = color.map(|c| c + (1.0 - c) * 0.32);
                     }
@@ -184,7 +184,7 @@ fn brand(size: usize) -> Vec<[f32; 4]> {
     pixels
 }
 
-/// Distancia con signo a una caja redondeada centrada en el origen (negativa adentro).
+/// Signed distance to a rounded box centered at the origin (negative inside).
 fn rounded_box(x: f32, y: f32, half_width: f32, half_height: f32, radius: f32) -> f32 {
     let qx = x.abs() - (half_width - radius);
     let qy = y.abs() - (half_height - radius);

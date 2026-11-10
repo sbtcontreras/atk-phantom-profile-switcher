@@ -1,50 +1,75 @@
-//! Menús oscuros cuando Windows usa el tema oscuro, como los del propio Explorador.
+//! Windows' theme: dark menus when Windows is dark, as in Explorer's own, and whether the shell
+//! (taskbar, flyouts) is light, which the on-screen notice follows.
 //!
-//! Windows no lo ofrece de forma documentada a una aplicación clásica: se pide con dos funciones
-//! de `uxtheme.dll` que solo se exportan por número (135 `SetPreferredAppMode` y 136
-//! `FlushMenuThemes`, desde Windows 10 1903), las mismas que usan muchas aplicaciones. Si no
-//! están, los menús quedan claros y nada más cambia.
+//! Windows offers dark menus to a classic app only through two functions of `uxtheme.dll`
+//! exported by number alone (135 `SetPreferredAppMode` and 136 `FlushMenuThemes`, since Windows 10
+//! 1903), the ones many apps use. Without them, menus stay light and nothing else changes.
+
+use std::mem::size_of;
+use std::ptr::null_mut;
 
 use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
+use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
 
 use crate::win::wide;
 
 const SET_PREFERRED_APP_MODE: usize = 135;
 const FLUSH_MENU_THEMES: usize = 136;
-/// `PreferredAppMode::AllowDark`: seguir el tema de Windows.
+/// `PreferredAppMode::AllowDark`: follow Windows' theme.
 const ALLOW_DARK: i32 = 1;
 
-/// Los menús siguen el tema de Windows desde ahora.
+const PERSONALIZE: &str = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+
+/// Menus follow Windows' theme from now on.
 pub fn follow_system() {
-    // SAFETY: la firma es la de `SetPreferredAppMode(PreferredAppMode) -> PreferredAppMode`.
+    // SAFETY: the signature is `SetPreferredAppMode(PreferredAppMode) -> PreferredAppMode`.
     if let Some(set_mode) = unsafe { export::<unsafe extern "system" fn(i32) -> i32>(SET_PREFERRED_APP_MODE) } {
-        // SAFETY: función de uxtheme con su firma.
+        // SAFETY: the uxtheme function with its signature.
         unsafe { set_mode(ALLOW_DARK) };
     }
     refresh();
 }
 
-/// Aplica a los menús un cambio de tema de Windows.
+/// Applies a change of Windows' theme to menus.
 pub fn refresh() {
-    // SAFETY: la firma es la de `FlushMenuThemes()`.
+    // SAFETY: the signature is `FlushMenuThemes()`.
     if let Some(flush) = unsafe { export::<unsafe extern "system" fn()>(FLUSH_MENU_THEMES) } {
-        // SAFETY: función de uxtheme con su firma.
+        // SAFETY: the uxtheme function with its signature.
         unsafe { flush() };
     }
 }
 
-/// La función de `uxtheme.dll` exportada con el número `ordinal`.
+/// Whether the taskbar and flyouts are light (Settings › Personalization › Colors).
+pub fn light_shell() -> bool {
+    let mut light = 0u32;
+    let mut size = size_of::<u32>() as u32;
+    // SAFETY: reads a DWORD into `light`; a missing value leaves Windows' default, dark.
+    unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            wide(PERSONALIZE).as_ptr(),
+            wide("SystemUsesLightTheme").as_ptr(),
+            RRF_RT_REG_DWORD,
+            null_mut(),
+            (&raw mut light).cast(),
+            &mut size,
+        )
+    };
+    light != 0
+}
+
+/// The function of `uxtheme.dll` exported as number `ordinal`.
 ///
 /// # Safety
-/// `F` debe ser la firma de esa función.
+/// `F` must be that function's signature.
 unsafe fn export<F: Copy>(ordinal: usize) -> Option<F> {
-    // SAFETY: uxtheme ya está cargada en todo proceso con ventanas; LoadLibrary solo la referencia.
+    // SAFETY: uxtheme is already loaded in every process with windows; this only references it.
     let module = unsafe { LoadLibraryW(wide("uxtheme.dll").as_ptr()) };
     if module.is_null() {
         return None;
     }
-    // SAFETY: un número de exportación se pasa como un puntero con ese valor (MAKEINTRESOURCE).
+    // SAFETY: an export number is passed as a pointer with that value (MAKEINTRESOURCE).
     let function = unsafe { GetProcAddress(module, ordinal as *const u8) }?;
-    // SAFETY: según el contrato, `F` es la firma de la función, del mismo tamaño que un puntero.
+    // SAFETY: by contract `F` is the function's signature, a pointer-sized function pointer.
     Some(unsafe { std::mem::transmute_copy(&function) })
 }

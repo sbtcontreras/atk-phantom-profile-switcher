@@ -1,5 +1,5 @@
-//! Las interfaces HID de Windows: cuáles hay, qué son y cómo hablarles con un reporte de salida
-//! y esperar, con plazo, el reporte de entrada que lo responde.
+//! Windows' HID interfaces: which there are, what they are, and how to send one an output report
+//! and wait, with a deadline, for the input report that answers it.
 
 use std::mem::{size_of, zeroed};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
@@ -25,12 +25,12 @@ use windows_sys::Win32::System::Threading::{CreateEventW, ResetEvent, WaitForSin
 
 use super::Disconnected;
 
-/// Lo que tarda como máximo en enviarse un reporte.
+/// The longest a report may take to be sent.
 const WRITE_WAIT_MS: u32 = 1000;
 
-/// Una interfaz HID presente: su ruta y lo que dice de sí misma.
+/// A present HID interface: its path and what it says about itself.
 pub struct Interface {
-    /// Terminada en 0, para `CreateFileW`.
+    /// NUL-terminated, for `CreateFileW`.
     path: Vec<u16>,
     pub vendor: u16,
     pub product: u16,
@@ -40,15 +40,15 @@ pub struct Interface {
     pub output_len: usize,
 }
 
-/// Todas las interfaces HID presentes que se dejan describir.
+/// Every present HID interface that can be described.
 pub fn interfaces() -> Vec<Interface> {
     paths().into_iter().filter_map(describe).collect()
 }
 
-/// Una interfaz abierta para hablarle.
+/// An interface opened to talk to it.
 pub struct Link {
     file: OwnedHandle,
-    /// La señal de fin de cada lectura o escritura (E/S superpuesta).
+    /// The signal that each read or write is done (overlapped I/O).
     event: OwnedHandle,
     input_len: usize,
     output_len: usize,
@@ -57,22 +57,22 @@ pub struct Link {
 impl Link {
     pub fn open(interface: &Interface) -> Option<Link> {
         let file = open_file(&interface.path, GENERIC_READ | GENERIC_WRITE, FILE_FLAG_OVERLAPPED)?;
-        // SAFETY: crea un evento sin nombre; el handle queda en un `OwnedHandle`.
+        // SAFETY: creates an unnamed event; the handle goes into an `OwnedHandle`.
         let event = unsafe { CreateEventW(null(), 1, 0, null()) };
         if event.is_null() {
             return None;
         }
         Some(Link {
             file,
-            // SAFETY: `event` es un handle válido recién creado y de nadie más.
+            // SAFETY: `event` is a valid handle just created, owned by nobody else.
             event: unsafe { OwnedHandle::from_raw_handle(event) },
             input_len: interface.input_len,
             output_len: interface.output_len,
         })
     }
 
-    /// Envía `packet` como el reporte `report_id` y devuelve el primer reporte de entrada que
-    /// `is_answer` acepta (sin el número de reporte), o `None` si no llega antes de `wait`.
+    /// Sends `packet` as report `report_id` and returns the first input report that `is_answer`
+    /// accepts (without the report number), or `None` if none arrives within `wait`.
     pub fn exchange(
         &mut self,
         report_id: u8,
@@ -80,7 +80,7 @@ impl Link {
         wait: Duration,
         is_answer: impl Fn(&[u8]) -> bool,
     ) -> Result<Option<Vec<u8>>, Disconnected> {
-        // SAFETY: handle abierto por `open`. Descarta respuestas viejas que quedaron en cola.
+        // SAFETY: a handle opened by `open`. Drops old answers left in the queue.
         unsafe { HidD_FlushQueue(self.raw()) };
         let mut report = vec![0u8; self.output_len.max(packet.len() + 1)];
         report[0] = report_id;
@@ -95,7 +95,7 @@ impl Link {
                 return Ok(None);
             }
             if let Some(read) = self.read(&mut buffer, left)? {
-                // Windows antepone el número de reporte.
+                // Windows puts the report number first.
                 let report = &buffer[1..read.max(1)];
                 if is_answer(report) {
                     return Ok(Some(report.to_vec()));
@@ -110,7 +110,7 @@ impl Link {
 
     fn write(&mut self, report: &[u8]) -> Result<(), Disconnected> {
         let mut overlapped = self.overlapped();
-        // SAFETY: `overlapped` y `report` viven hasta que la escritura termina o se cancela.
+        // SAFETY: `overlapped` and `report` live until the write ends or is cancelled.
         let started =
             unsafe { WriteFile(self.raw(), report.as_ptr(), report.len() as u32, null_mut(), &mut overlapped) };
         match self.finish(started, &overlapped, WRITE_WAIT_MS)? {
@@ -119,10 +119,10 @@ impl Link {
         }
     }
 
-    /// Un reporte de entrada, o `None` si no llegó ninguno antes de `wait`.
+    /// An input report, or `None` if none arrived within `wait`.
     fn read(&mut self, buffer: &mut [u8], wait: Duration) -> Result<Option<usize>, Disconnected> {
         let mut overlapped = self.overlapped();
-        // SAFETY: `overlapped` y `buffer` viven hasta que la lectura termina o se cancela.
+        // SAFETY: `overlapped` and `buffer` live until the read ends or is cancelled.
         let started =
             unsafe { ReadFile(self.raw(), buffer.as_mut_ptr(), buffer.len() as u32, null_mut(), &mut overlapped) };
         let millis = wait.as_millis().clamp(1, u128::from(u32::MAX)) as u32;
@@ -130,18 +130,18 @@ impl Link {
     }
 
     fn overlapped(&self) -> OVERLAPPED {
-        // SAFETY: OVERLAPPED es datos planos; en cero es su estado inicial.
+        // SAFETY: OVERLAPPED is plain data; all zeros is its initial state.
         let mut overlapped: OVERLAPPED = unsafe { zeroed() };
         overlapped.hEvent = self.event.as_raw_handle();
-        // SAFETY: el evento es de este `Link`.
+        // SAFETY: the event belongs to this `Link`.
         unsafe { ResetEvent(overlapped.hEvent) };
         overlapped
     }
 
-    /// Espera una operación superpuesta: sus bytes, `None` si no terminó a tiempo (y se cancela),
-    /// o `Disconnected` si falló.
+    /// Waits for an overlapped operation: its bytes, `None` if it did not end in time (and is
+    /// cancelled), or `Disconnected` if it failed.
     fn finish(&self, started: i32, overlapped: &OVERLAPPED, millis: u32) -> Result<Option<usize>, Disconnected> {
-        // SAFETY: `overlapped` es el de la operación recién empezada sobre este handle.
+        // SAFETY: `overlapped` is that of the operation just started on this handle.
         unsafe {
             if started == 0 && GetLastError() != ERROR_IO_PENDING {
                 return Err(Disconnected);
@@ -149,7 +149,7 @@ impl Link {
             let mut done = 0u32;
             if WaitForSingleObject(overlapped.hEvent, millis) != WAIT_OBJECT_0 {
                 CancelIoEx(self.raw(), overlapped);
-                // Si terminó justo antes de cancelarse, se aprovecha.
+                // If it ended just before being cancelled, its result is used.
                 let finished = GetOverlappedResult(self.raw(), overlapped, &mut done, 1) != 0;
                 return Ok(finished.then_some(done as usize));
             }
@@ -163,25 +163,25 @@ impl Link {
 
 impl Drop for Link {
     fn drop(&mut self) {
-        // SAFETY: cancela lo que quede pendiente antes de que se cierre el handle.
+        // SAFETY: cancels anything pending before the handle is closed.
         unsafe { CancelIoEx(self.raw(), null()) };
     }
 }
 
 fn open_file(path: &[u16], access: u32, flags: u32) -> Option<OwnedHandle> {
-    // SAFETY: `path` termina en 0; el handle queda en un `OwnedHandle`.
+    // SAFETY: `path` is NUL-terminated; the handle goes into an `OwnedHandle`.
     let handle = unsafe {
         CreateFileW(path.as_ptr(), access, FILE_SHARE_READ | FILE_SHARE_WRITE, null(), OPEN_EXISTING, flags, null_mut())
     };
-    // SAFETY: un handle válido recién abierto y de nadie más.
+    // SAFETY: a valid handle just opened, owned by nobody else.
     (handle != INVALID_HANDLE_VALUE).then(|| unsafe { OwnedHandle::from_raw_handle(handle) })
 }
 
-/// Fabricante, producto, interfaz y largo de reportes, sin abrirla para leer ni escribir.
+/// Vendor, product, interface and report lengths, without opening it to read or write.
 fn describe(path: Vec<u16>) -> Option<Interface> {
     let file = open_file(&path, 0, 0)?;
     let handle = file.as_raw_handle();
-    // SAFETY: estructuras planas inicializadas; los datos preparados se liberan antes de salir.
+    // SAFETY: initialized plain structures; the preparsed data is freed before returning.
     unsafe {
         let mut attributes: HIDD_ATTRIBUTES = zeroed();
         attributes.Size = size_of::<HIDD_ATTRIBUTES>() as u32;
@@ -204,10 +204,10 @@ fn describe(path: Vec<u16>) -> Option<Interface> {
     }
 }
 
-/// Las rutas (terminadas en 0) de las interfaces HID presentes.
+/// The paths (NUL-terminated) of the present HID interfaces.
 fn paths() -> Vec<Vec<u16>> {
     let mut paths = Vec::new();
-    // SAFETY: la lista se destruye al final; cada detalle se lee dentro de su búfer alineado.
+    // SAFETY: the list is destroyed at the end; each detail is read within its aligned buffer.
     unsafe {
         let mut guid = zeroed();
         HidD_GetHidGuid(&mut guid);

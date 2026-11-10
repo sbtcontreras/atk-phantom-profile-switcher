@@ -1,34 +1,34 @@
-//! El protocolo del ATK Phantom Ultimate (firmware BITMOUSE), tal como lo usa ATK HUB: cómo se
-//! arma cada pedido y cómo se lee su respuesta. Sin E/S, para probarlo con respuestas reales.
+//! The protocol of the ATK Phantom Ultimate (BITMOUSE firmware), as ATK HUB uses it: how each
+//! request is built and how its answer is read. No I/O, so it is tested with real answers.
 //!
-//! Cada pedido es el reporte 8, de 63 bytes:
+//! Each request is report 8, 63 bytes long:
 //!
 //! ```text
-//! [checksum] [0x72] [largo de parámetros] [secuencia] [ruta] [comando] [largo] [datos…]
+//! [checksum] [0x72] [parameter length] [sequence] [route] [command] [length] [data…]
 //! ```
 //!
-//! El checksum es la suma de los bytes 1 a 62. La ruta es 0 para el mouse por cable y 1 para el
-//! mouse a través de su receptor: con 0, el receptor responde por sí mismo, todo en cero. La
-//! respuesta (sin el número de reporte) repite el comando en el byte 4 y trae sus datos desde el
-//! 6; el receptor manda antes un aviso de espera (`72 02 …`) que no lo repite.
+//! The checksum is the sum of bytes 1 to 62. The route is 0 for the wired mouse and 1 for the
+//! mouse through its receiver: with 0, the receiver answers for itself, all zeros. The answer
+//! (without the report number) repeats the command in byte 4 and carries its data from byte 6;
+//! the receiver first sends a wait notice (`72 02 …`) that does not repeat it.
 
 pub const REPORT_ID: u8 = 8;
 pub const PACKET_LEN: usize = 63;
 
 const HEADER: u8 = 0x72;
-/// Dónde empiezan los datos de una respuesta.
+/// Where an answer's data starts.
 const DATA: usize = 6;
 
-/// Dónde está la tabla de DPI en la memoria de la configuración activa: el nivel activo, la
-/// cantidad de niveles y, por nivel, 8 bytes (DPI horizontal y vertical de 16 bits y su color).
+/// Where the DPI table is in the active profile's memory: the active level, the number of
+/// levels and, per level, 8 bytes (16-bit horizontal and vertical DPI, and its color).
 pub const DPI_TABLE: u16 = 1;
-/// Dónde está el modo del sensor («Sensor Sampling Rate» en ATK HUB) de la configuración activa.
+/// Where the active profile's sensor mode ("Sensor Sampling Rate" in ATK HUB) is.
 pub const SENSOR_MODE: u16 = 74;
-/// Bit de las funciones del mouse: tiene el modo de 13K, y entonces el modo del sensor no está en
+/// Bit of the mouse's features: it has the 13K mode, and then the sensor mode is not at
 /// `SENSOR_MODE`.
 pub const FEATURE_FPS_13K: u8 = 8;
 
-/// Una de las 4 configuraciones del mouse: 1 a 4, como en ATK HUB (0 a 3 en el mouse).
+/// One of the mouse's 4 profiles: 1 to 4, as in ATK HUB (0 to 3 in the mouse).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Slot(u8);
 
@@ -52,23 +52,23 @@ impl Slot {
     }
 }
 
-/// Por dónde se le habla al mouse.
+/// How the mouse is reached.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Route {
     Wired,
     Receiver,
 }
 
-/// Lo que se le puede pedir al mouse. Todo es lectura, salvo `Activate`.
+/// What the mouse can be asked. Everything is a read, but `Activate`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Request {
-    /// La configuración activa y su polling rate.
+    /// The active profile and its polling rate.
     Active,
     Activate(Slot),
     Battery,
     Charging,
     Features,
-    /// Hasta 10 bytes de la memoria de la configuración activa.
+    /// Up to 10 bytes of the active profile's memory.
     Memory {
         address: u16,
         len: u8,
@@ -87,7 +87,7 @@ impl Request {
         }
     }
 
-    /// Largo de parámetros, largo del comando y datos, como los arma ATK HUB.
+    /// Parameter length, command length and data, as ATK HUB builds them.
     fn parameters(self) -> (u8, u8, Vec<u8>) {
         match self {
             Request::Active => (20, 18, vec![]),
@@ -101,7 +101,7 @@ impl Request {
         }
     }
 
-    /// El pedido, sin el número de reporte.
+    /// The request, without the report number.
     pub fn packet(self, route: Route) -> [u8; PACKET_LEN] {
         let (param_len, cmd_len, data) = self.parameters();
         let mut p = [0u8; PACKET_LEN];
@@ -118,14 +118,14 @@ impl Request {
         p
     }
 
-    /// Los datos de `report` (sin el número de reporte) si es la respuesta a este pedido.
+    /// The data of `report` (without the report number) if it answers this request.
     pub fn answer(self, report: &[u8]) -> Option<&[u8]> {
         let command = self.command();
         (report.len() > DATA && report[4] == command).then(|| &report[DATA..])
     }
 }
 
-/// La configuración activa y su polling rate, de la respuesta a `Request::Active`.
+/// The active profile and its polling rate, from the answer to `Request::Active`.
 pub fn active(data: &[u8]) -> Option<(Slot, Option<u32>)> {
     let slot = Slot::from_index(*data.first()?)?;
     let polling_hz = data.get(2).and_then(|code| match code {
@@ -141,17 +141,17 @@ pub fn active(data: &[u8]) -> Option<(Slot, Option<u32>)> {
     Some((slot, polling_hz))
 }
 
-/// Los bytes leídos de la memoria, de la respuesta a `Request::Memory`.
+/// The bytes read from memory, from the answer to `Request::Memory`.
 pub fn memory(data: &[u8], len: u8) -> Option<&[u8]> {
     data.get(3..3 + usize::from(len))
 }
 
-/// Dónde está, en la tabla de DPI, el DPI del nivel `level`.
+/// Where, in the DPI table, the DPI of level `level` is.
 pub fn dpi_entry(level: u8) -> u16 {
     DPI_TABLE + 2 + 8 * u16::from(level)
 }
 
-/// DPI horizontal y vertical de los 4 primeros bytes de un nivel de la tabla.
+/// Horizontal and vertical DPI from the first 4 bytes of a level of the table.
 pub fn dpi(entry: &[u8]) -> Option<(u16, u16)> {
     match entry {
         [x0, x1, y0, y1, ..] => Some((u16::from_le_bytes([*x0, *x1]), u16::from_le_bytes([*y0, *y1]))),
@@ -159,18 +159,18 @@ pub fn dpi(entry: &[u8]) -> Option<(u16, u16)> {
     }
 }
 
-/// El modo del sensor, como lo llama ATK HUB.
+/// The sensor mode, as ATK HUB names it.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Sensor {
-    /// «Basic Mode»: bajo consumo.
+    /// "Basic Mode": low power.
     Basic,
-    /// «ATK Shard Competitive Firmware».
+    /// "ATK Shard Competitive Firmware".
     Competitive,
-    /// «ATK Shard Competitive Firmware MAX».
+    /// "ATK Shard Competitive Firmware MAX".
     Max,
 }
 
-/// El modo del sensor guardado en `SENSOR_MODE`.
+/// The sensor mode stored at `SENSOR_MODE`.
 pub fn sensor(mode: u8) -> Option<Sensor> {
     match mode {
         0 => Some(Sensor::Basic),
@@ -184,7 +184,7 @@ pub fn sensor(mode: u8) -> Option<Sensor> {
 mod tests {
     use super::*;
 
-    /// Una respuesta capturada con hub.atk.pro, como texto hexadecimal.
+    /// An answer captured with hub.atk.pro, as hexadecimal text.
     fn report(hex: &str) -> Vec<u8> {
         let mut bytes: Vec<u8> = hex.split_whitespace().filter_map(|b| u8::from_str_radix(b, 16).ok()).collect();
         bytes.resize(PACKET_LEN, 0);
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn reads_the_dpi_of_the_active_level() {
-        // La tabla de DPI que leyó el diagnóstico: un solo nivel, 1600 × 1600.
+        // The DPI table read from the user's mouse: a single level, 1600 × 1600.
         let table = report("00 08 40 06 40 06 ff 00 00 00 00 00 00 00 ff 00");
         assert_eq!(table[0], 0);
         let entry = usize::from(dpi_entry(table[0]) - DPI_TABLE);
