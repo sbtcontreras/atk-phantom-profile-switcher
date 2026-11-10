@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/icon.svg" alt="Phantom Switch icon: a ghost shaped like a mouse" width="112">
+<img src="assets/icon.svg" alt="Phantom Switch icon: a ghost shaped like a mouse" width="112">
 
 # Phantom Switch
 
@@ -126,6 +126,8 @@ src/
 ├── badge.rs     the badge that stands for each profile
 ├── paint.rs     drawing: shapes, text, icons and bitmaps
 └── …            texts in two languages, theme, settings
+assets/          the app's icon and manifest, put in the .exe by build.rs
+tools/icon/      draws the icon
 ```
 
 ## Building
@@ -138,6 +140,11 @@ cargo build --release
 
 From Linux or WSL, with [`cargo-xwin`](https://github.com/rust-cross/cargo-xwin):
 `cargo xwin build --release`. The executable lands in `target/x86_64-pc-windows-msvc/release/`.
+
+The icon is drawn in code, in [`tools/icon`](tools/icon/src/main.rs): after changing it, run
+`cargo run -p icon` from the repository's root (from Linux, add `--target x86_64-unknown-linux-gnu`)
+to write `assets/icon.ico`, `assets/icon.svg` and the illustration's icon again. CI checks they
+are up to date.
 
 Releases publish themselves: pushing a `vX.Y.Z` tag runs the tests, builds the app and uploads it
 to Releases with that version's section of the [changelog](CHANGELOG.md) as its notes.

@@ -1,0 +1,9 @@
+[package]
+name = "icon"
+version = "0.0.0"
+edition = "2024"
+description = "Draws Phantom Switch's icon: assets/icon.ico, assets/icon.svg and the illustration's."
+publish = false
+
+[lints]
+workspace = true

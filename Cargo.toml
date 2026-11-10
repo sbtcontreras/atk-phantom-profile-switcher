@@ -6,6 +6,7 @@ description = "Phantom Switch: switch the ATK Phantom Ultimate's onboard profile
 license = "MIT"
 repository = "https://github.com/sbtcontreras/atk-phantom-profile-switcher"
 publish = false
+rust-version = "1.88"
 
 [[bin]]
 name = "PhantomSwitch"
@@ -31,10 +32,16 @@ windows-sys = { version = "0.61", features = [
 [build-dependencies]
 embed-resource = "3"
 
-[lints.rust]
+[lints]
+workspace = true
+
+[workspace]
+members = ["tools/icon"]
+
+[workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
 
-[lints.clippy]
+[workspace.lints.clippy]
 undocumented_unsafe_blocks = "warn"
 unwrap_used = "warn"
 expect_used = "warn"

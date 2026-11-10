@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
   <title>Phantom Switch</title>
-  <!-- The same drawing as the .exe's icon (build.rs), at 256 px. -->
+  <!-- Drawn by tools/icon, like assets/icon.ico. -->
   <defs>
     <linearGradient id="back" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="256">
       <stop offset="0" stop-color="#332e26"/>
       <stop offset="1" stop-color="#13110e"/>
     </linearGradient>
-    <radialGradient id="light" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="204.8" gradientTransform="translate(128 -12.8) scale(1 0.8333)">
+    <radialGradient id="light" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="204.8" gradientTransform="translate(128 -12.8) scale(1 0.833)">
       <stop offset="0" stop-color="#73634a" stop-opacity="0.45"/>
       <stop offset="0.25" stop-color="#73634a" stop-opacity="0.253"/>
-      <stop offset="0.5" stop-color="#73634a" stop-opacity="0.113"/>
+      <stop offset="0.5" stop-color="#73634a" stop-opacity="0.112"/>
       <stop offset="0.75" stop-color="#73634a" stop-opacity="0.028"/>
       <stop offset="1" stop-color="#73634a" stop-opacity="0"/>
     </radialGradient>
@@ -18,32 +18,32 @@
       <stop offset="1" stop-color="#000" stop-opacity="0"/>
     </radialGradient>
     <clipPath id="ghost">
-      <path d="M 71.68 115.2 A 56.32 56.32 0 0 1 184.32 115.2 Q 184.32 145.92 197.12 176.64 L 174.08 209.41 L 151.04 176.64 L 128 217.6 L 104.96 176.64 L 81.92 209.41 L 58.88 176.64 Q 71.68 145.92 71.68 115.2 Z"/>
+      <path d="M 71.68 115.2 A 56.32 56.32 0 0 1 184.32 115.2 Q 184.32 145.92 197.12 176.64 L 174.08 209.408 L 151.04 176.64 L 128 217.6 L 104.96 176.64 L 81.92 209.408 L 58.88 176.64 Q 71.68 145.92 71.68 115.2 Z"/>
     </clipPath>
     <clipPath id="wheel">
-      <rect x="121.86" y="64" width="12.29" height="25.6" rx="3.07"/>
+      <rect x="121.856" y="64" width="12.288" height="25.6" rx="3.072"/>
     </clipPath>
   </defs>
   <rect x="7.68" y="7.68" width="240.64" height="240.64" rx="56.32" fill="url(#back)"/>
   <rect x="7.68" y="7.68" width="240.64" height="240.64" rx="56.32" fill="url(#light)"/>
-  <rect x="9.22" y="9.22" width="237.57" height="237.57" rx="54.78" fill="none" stroke="#cca35c" stroke-opacity="0.6" stroke-width="3.07"/>
+  <rect x="9.216" y="9.216" width="237.568" height="237.568" rx="54.784" fill="none" stroke="#cca35c" stroke-opacity="0.6" stroke-width="3.072"/>
   <ellipse cx="128" cy="224" rx="56.32" ry="7.68" fill="url(#shadow)"/>
   <g clip-path="url(#ghost)">
     <rect x="0" y="0" width="128" height="256" fill="#f2ebdb"/>
     <rect x="128" y="0" width="128" height="256" fill="#dbd1bd"/>
-    <rect x="125.7" y="0" width="4.61" height="102.4" fill="#cca35c"/>
+    <rect x="125.696" y="0" width="4.608" height="102.4" fill="#cca35c"/>
   </g>
   <g clip-path="url(#wheel)">
-    <rect x="121.86" y="64" width="12.29" height="25.6" fill="#cca35c"/>
+    <rect x="121.856" y="64" width="12.288" height="25.6" fill="#cca35c"/>
     <g fill="#8c6b38">
-      <rect x="121.86" y="64" width="12.29" height="3.33"/>
-      <rect x="121.86" y="70.66" width="12.29" height="3.33"/>
-      <rect x="121.86" y="77.31" width="12.29" height="3.33"/>
-      <rect x="121.86" y="83.97" width="12.29" height="3.33"/>
+      <rect x="121.856" y="64" width="12.288" height="3.328"/>
+      <rect x="121.856" y="70.656" width="12.288" height="3.328"/>
+      <rect x="121.856" y="77.312" width="12.288" height="3.328"/>
+      <rect x="121.856" y="83.968" width="12.288" height="3.328"/>
     </g>
   </g>
   <g fill="#17130f">
-    <path d="M 90.88 113.92 L 120.32 126.72 L 118.27 135.17 L 95.23 128 Z"/>
-    <path d="M 165.12 113.92 L 135.68 126.72 L 137.73 135.17 L 160.77 128 Z"/>
+    <path d="M 90.88 113.92 L 120.32 126.72 L 118.272 135.168 L 95.232 128 Z"/>
+    <path d="M 165.12 113.92 L 135.68 126.72 L 137.728 135.168 L 160.768 128 Z"/>
   </g>
 </svg>

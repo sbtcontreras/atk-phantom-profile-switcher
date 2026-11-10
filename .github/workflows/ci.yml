@@ -1,4 +1,4 @@
-# On every push and pull request: formatting, clippy and tests, on Windows.
+# On every push and pull request: formatting, clippy, tests and the drawn icon, on Windows.
 name: CI
 
 on:
@@ -16,10 +16,14 @@ jobs:
         run: rustup update stable && rustup default stable && rustup component add rustfmt clippy
 
       - name: Formatting
-        run: cargo fmt --check
+        run: cargo fmt --all --check
 
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Tests
-        run: cargo test
+        run: cargo test --workspace
+
+      - name: The icon is up to date with tools/icon
+        shell: bash
+        run: cargo run -p icon && git diff --exit-code -- assets docs
