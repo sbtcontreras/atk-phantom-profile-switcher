@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="810" viewBox="0 0 1440 810" font-family="'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif">
+  <title>Phantom Switch: the on-screen notice and the tray menu (illustration)</title>
+  <defs>
+    <clipPath id="frame"><rect width="1440" height="810" rx="18"/></clipPath>
+    <radialGradient id="bloom-blue" cx="78%" cy="74%" r="70%">
+      <stop offset="0" stop-color="#3b82f6" stop-opacity="0.85"/>
+      <stop offset="0.55" stop-color="#1e3a8a" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#0b1022" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bloom-violet" cx="18%" cy="22%" r="62%">
+      <stop offset="0" stop-color="#8b5cf6" stop-opacity="0.75"/>
+      <stop offset="0.6" stop-color="#4c1d95" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#0b1022" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#93c5fd" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#6366f1" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="b1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a8af0"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
+    <linearGradient id="b2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e35b5b"/><stop offset="1" stop-color="#dc2626"/></linearGradient>
+    <linearGradient id="b3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#47b070"/><stop offset="1" stop-color="#16a34a"/></linearGradient>
+    <linearGradient id="b4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#df8a31"/><stop offset="1" stop-color="#d97706"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-30%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="40"/></filter>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <!-- Wallpaper -->
+    <rect width="1440" height="810" fill="#0b1022"/>
+    <rect width="1440" height="810" fill="url(#bloom-violet)"/>
+    <rect width="1440" height="810" fill="url(#bloom-blue)"/>
+    <path d="M -80 640 C 260 420, 560 520, 820 300 S 1300 60, 1560 180 L 1560 260 C 1280 160, 1060 320, 860 430 S 300 640, -80 760 Z" fill="url(#ribbon)" filter="url(#soft)"/>
+
+    <!-- Taskbar -->
+    <rect y="762" width="1440" height="48" fill="#1c1c1c" fill-opacity="0.94"/>
+    <rect y="762" width="1440" height="1" fill="#ffffff" fill-opacity="0.08"/>
+    <g transform="translate(624 774)">
+      <g fill="#4cc2ff"><rect width="11" height="11" rx="1.5"/><rect x="13" width="11" height="11" rx="1.5"/><rect y="13" width="11" height="11" rx="1.5"/><rect x="13" y="13" width="11" height="11" rx="1.5"/></g>
+      <rect x="44" y="0" width="24" height="24" rx="6" fill="#ffffff" fill-opacity="0.14"/>
+      <rect x="84" y="0" width="24" height="24" rx="6" fill="#ffffff" fill-opacity="0.14"/>
+      <rect x="124" y="0" width="24" height="24" rx="6" fill="#ffffff" fill-opacity="0.14"/>
+      <rect x="164" y="0" width="24" height="24" rx="6" fill="#ffffff" fill-opacity="0.14"/>
+    </g>
+    <!-- Tray: overflow chevron, Phantom Switch, network, sound, battery, clock -->
+    <path d="M 1206 790 l 6 -6 l 6 6" fill="none" stroke="#ffffff" stroke-opacity="0.8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="1226" y="770" width="36" height="32" rx="5" fill="#ffffff" fill-opacity="0.08"/>
+    <g transform="translate(1234 776)">
+      <rect width="20" height="20" rx="5.6" fill="url(#b2)"/>
+      <text x="10" y="15" text-anchor="middle" font-size="14.5" font-weight="600" fill="#fff">2</text>
+    </g>
+    <g fill="none" stroke="#ffffff" stroke-opacity="0.85" stroke-width="1.5" stroke-linecap="round">
+      <path d="M 1276 784 a 11 11 0 0 1 16 0"/><path d="M 1279.5 788 a 6 6 0 0 1 9 0"/>
+      <path d="M 1303 783 h 3 l 5 -4 v 14 l -5 -4 h -3 z" stroke-linejoin="round"/><path d="M 1315 782.5 a 5 5 0 0 1 0 7"/>
+      <rect x="1326" y="781" width="17" height="9" rx="2"/><path d="M 1345 784 v 3"/>
+    </g>
+    <rect x="1328" y="783" width="11" height="5" rx="1" fill="#ffffff" fill-opacity="0.85"/>
+    <text x="1424" y="783" text-anchor="end" font-size="12" fill="#fff">5:42 PM</text>
+    <text x="1424" y="799" text-anchor="end" font-size="12" fill="#fff">11/10/2026</text>
+
+    <!-- The on-screen notice -->
+    <g transform="translate(555 650)" filter="url(#shadow)">
+      <rect width="330" height="64" rx="10" fill="#202020"/>
+      <rect x="0.5" y="0.5" width="329" height="63" rx="9.5" fill="none" stroke="#ffffff" stroke-opacity="0.1"/>
+      <g transform="translate(14 16)">
+        <rect width="32" height="32" rx="9" fill="url(#b2)"/>
+        <text x="16" y="24" text-anchor="middle" font-size="23" font-weight="600" fill="#fff">2</text>
+      </g>
+      <text x="58" y="29" font-size="15" font-weight="600" fill="#fff">Profile 2</text>
+      <text x="58" y="47" font-size="13" fill="#c8c8c8">4000 Hz · 1600 DPI · competitive sensor</text>
+    </g>
+
+    <!-- The tray menu -->
+    <g transform="translate(890 434)" filter="url(#shadow)">
+      <rect width="440" height="318" rx="8" fill="#2c2c2c"/>
+      <rect x="0.5" y="0.5" width="439" height="317" rx="7.5" fill="none" stroke="#ffffff" stroke-opacity="0.09"/>
+      <g font-size="13" fill="#fff">
+        <text x="44" y="27" fill="#9a9a9a">Wireless · battery 90%</text>
+        <rect x="12" y="43" width="416" height="1" fill="#ffffff" fill-opacity="0.09"/>
+
+        <g transform="translate(0 50)">
+          <g transform="translate(16 7)"><rect width="18" height="18" rx="5" fill="url(#b1)"/><text x="9" y="13.6" text-anchor="middle" font-size="13" font-weight="600">1</text></g>
+          <text x="44" y="21">Profile 1</text>
+          <text x="424" y="21" text-anchor="end" fill="#a8a8a8">1000 Hz · 1600 DPI · basic sensor</text>
+        </g>
+        <g transform="translate(0 82)">
+          <rect x="6" y="1" width="428" height="30" rx="4" fill="#ffffff" fill-opacity="0.07"/>
+          <rect x="12" y="3" width="26" height="26" rx="5" fill="#ffffff" fill-opacity="0.12"/>
+          <g transform="translate(16 7)"><rect width="18" height="18" rx="5" fill="url(#b2)"/><text x="9" y="13.6" text-anchor="middle" font-size="13" font-weight="600">2</text></g>
+          <text x="44" y="21" font-weight="600">Profile 2</text>
+          <text x="424" y="21" text-anchor="end" fill="#a8a8a8">4000 Hz · 1600 DPI · competitive sensor</text>
+        </g>
+        <g transform="translate(0 114)">
+          <g transform="translate(16 7)"><rect width="18" height="18" rx="5" fill="url(#b3)"/><text x="9" y="13.6" text-anchor="middle" font-size="13" font-weight="600">3</text></g>
+          <text x="44" y="21">Profile 3</text>
+        </g>
+        <g transform="translate(0 146)">
+          <g transform="translate(16 7)"><rect width="18" height="18" rx="5" fill="url(#b4)"/><text x="9" y="13.6" text-anchor="middle" font-size="13" font-weight="600">4</text></g>
+          <text x="44" y="21">Profile 4</text>
+        </g>
+        <rect x="12" y="183" width="416" height="1" fill="#ffffff" fill-opacity="0.09"/>
+
+        <text x="44" y="211">Open ATK HUB</text>
+        <path d="M 20 236 l 4 4 l 8 -9" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="44" y="243">Show a notice when switching</text>
+        <path d="M 20 268 l 4 4 l 8 -9" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="44" y="275">Start with Windows</text>
+        <text x="44" y="307">Exit</text>
+      </g>
+    </g>
+  </g>
+  <rect x="0.5" y="0.5" width="1439" height="809" rx="17.5" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+</svg>

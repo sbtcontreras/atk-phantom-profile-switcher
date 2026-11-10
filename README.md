@@ -8,6 +8,12 @@
 [![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%C2%B7%2011-0078d4)](#compatibility)
 [![MIT license](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
 
+<br>
+
+<img src="docs/preview.svg" alt="The on-screen notice after switching to profile 2, and the tray menu with the four profiles" width="100%">
+
+<sub>Illustration of the on-screen notice and the tray menu.</sub>
+
 </div>
 
 ---
