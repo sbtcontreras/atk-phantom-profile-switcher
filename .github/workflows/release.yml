@@ -16,6 +16,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # checkout deja la etiqueta como una referencia simple, sin su mensaje: sin traerla, las
+      # notas serían el mensaje del commit.
+      - name: Notas de la versión
+        shell: bash
+        run: |
+          git fetch --no-tags --depth=1 --force origin "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" != "tag" ]; then
+            echo "La etiqueta $GITHUB_REF_NAME no es anotada: su mensaje son las notas de la versión."
+            exit 1
+          fi
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
       - name: Rust estable
         run: rustup update stable && rustup default stable
 
@@ -44,4 +57,4 @@ jobs:
           prerelease=""
           case "$GITHUB_REF_NAME" in v0.*) prerelease="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" PhantomSwitch.exe PhantomSwitch.exe.sha256 \
-            --title "$GITHUB_REF_NAME" --notes-from-tag $prerelease
+            --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" $prerelease
