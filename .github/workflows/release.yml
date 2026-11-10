@@ -39,9 +39,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp target/x86_64-pc-windows-msvc/release/AtkPhantomModo.exe .
-          sha256sum AtkPhantomModo.exe > AtkPhantomModo.exe.sha256
+          cp target/x86_64-pc-windows-msvc/release/PhantomSwitch.exe .
+          sha256sum PhantomSwitch.exe > PhantomSwitch.exe.sha256
           prerelease=""
           case "$GITHUB_REF_NAME" in v0.*) prerelease="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" AtkPhantomModo.exe AtkPhantomModo.exe.sha256 \
+          gh release create "$GITHUB_REF_NAME" PhantomSwitch.exe PhantomSwitch.exe.sha256 \
             --title "$GITHUB_REF_NAME" --notes-from-tag $prerelease

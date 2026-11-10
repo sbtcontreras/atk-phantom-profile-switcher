@@ -1,116 +1,151 @@
-# ATK Phantom Modo
+<div align="center">
 
-Cambia la configuración interna (onboard) del **ATK Phantom Ultimate** desde un ícono junto al
-reloj de Windows, sin abrir ATK HUB. Un clic para pasar de tu configuración normal a la
-competitiva, y un menú con la batería y el polling rate, el DPI y el modo del sensor de cada una.
+# Phantom Switch
 
-*In English: [below](#in-english).*
+**Tus configuraciones del ATK Phantom, a un clic del reloj.**
 
-> Programa independiente, sin relación con ATK. Usa los mismos comandos que la página oficial
-> [ATK HUB](https://hub.atk.pro/), leídos de su código público. Probado con el ATK Phantom
-> Ultimate de firmware BITMOUSE, por cable y con su receptor 8K.
+[![Versión](https://img.shields.io/github/v/release/sbtcontreras/atk-phantom-profile-switcher?include_prereleases&label=versi%C3%B3n&color=6366f1)](https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases)
+[![Windows 10 y 11](https://img.shields.io/badge/Windows-10%20%C2%B7%2011-0078d4)](#compatibilidad)
+[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-22c55e)](LICENSE)
+
+*[In English below](#in-english)*
+
+</div>
+
+---
+
+El ATK Phantom Ultimate guarda cuatro configuraciones en su memoria —DPI, polling rate, modo del
+sensor, botones—, pero cambiar de una a otra exige abrir ATK HUB en el navegador. **Phantom Switch**
+vive junto al reloj de Windows y lo hace en un clic: pasa de tu configuración normal a la
+competitiva y vuelve, sin abrir nada, sin instalar nada y sin tocar el rendimiento del mouse.
+
+## Lo que hace
+
+- **Un clic para cambiar.** El ícono muestra el número de la configuración activa, cada una con su
+  color, y un clic te devuelve a la que usaste antes.
+- **Todo a la vista.** El menú muestra cómo está conectado el mouse, su batería y, para cada
+  configuración, el polling rate, el DPI y el modo del sensor, leídos del propio mouse.
+- **Avisa antes de quedarte sin batería.** Una notificación al bajar del 15 % y otra al 5 %.
+- **Se ve en casa en Windows.** Íconos nítidos con cualquier escalado de pantalla, menús en modo
+  oscuro cuando Windows lo está, y manejo con el teclado.
+- **Arranca con Windows**, si quieres, y tiene a mano un acceso a ATK HUB.
 
 ## Descarga
 
-En [Releases](../../releases), `AtkPhantomModo.exe`: un solo archivo de unos 270 KB, sin
-instalación ni archivos al lado. Funciona en Windows 10 y 11.
+Descarga **`PhantomSwitch.exe`** desde [Releases](https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases)
+y ábrelo. Es un solo archivo de menos de 400 KB: no se instala ni deja archivos al lado.
 
-Windows puede avisar «Windows protegió su PC» la primera vez, porque el programa no está firmado:
-**Más información › Ejecutar de todas formas**.
+> La primera vez, Windows puede mostrar «Windows protegió su PC», porque el programa no está
+> firmado. Elige **Más información › Ejecutar de todas formas**. Cada versión la compila GitHub
+> desde este mismo código, y junto a cada `.exe` se publica su SHA-256.
 
-## Uso
+## Cómo se usa
 
-El ícono muestra el número de la configuración activa (1 azul, 2 rojo, 3 verde, 4 ámbar), o **?**
-gris si no encuentra el mouse.
+Arma tus configuraciones en [ATK HUB](https://hub.atk.pro/) como siempre. Phantom Switch se encarga
+de cambiar entre ellas.
 
-- **Clic**: vuelve a la configuración que usaste antes (la 1 o la 2 mientras no hayas usado otra).
-- **Clic derecho**: el menú, leído del mouse al abrirlo:
-
-  ```
-  Inalámbrico · batería 90 %
-  ──────────────────────────────────────────────────────────
-    Configuración 1    1000 Hz · 1600 DPI · sensor básico
-  ✓ Configuración 2    4000 Hz · 1600 DPI · sensor competitivo
-    Configuración 3
-    Configuración 4
-  ──────────────────────────────────────────────────────────
-    Abrir ATK HUB
-    Iniciar con Windows
-    Salir
-  ```
-
-  La activa se lee en ese momento; las otras muestran lo que se leyó la última vez que estuvieron
-  activas.
-- **Batería baja**: por el receptor, revisa la batería cada 15 minutos y avisa con una
-  notificación al bajar del 15 % y del 5 %. Mientras juegas a pantalla completa, Windows guarda
-  las notificaciones en su centro de notificaciones.
-
-Las configuraciones se arman en ATK HUB (DPI, polling rate, sensor, botones…); este programa solo
-cambia de una a otra. No uses la página y el programa a la vez: el receptor atiende un pedido a la
-vez y se pierden respuestas.
-
-## Qué le hace al mouse
-
-- **No escucha el mouse ni el teclado.** No está en el camino de lo que el mouse le manda a
-  Windows: en reposo no usa procesador.
-- **Solo lee**, salvo un comando: activar otra configuración (1 a 4). Nunca escribe DPI, botones,
-  macros ni firmware.
-- **Envía cada paquete una vez**, nunca dos cambios a la vez, y no escribe la configuración que el
-  mouse ya tiene.
-- Le habla cuando se lo pides, cuando Windows avisa que se conectó o desconectó algo por USB y,
-  por el receptor, para la batería cada 15 minutos.
-
-### El protocolo
-
-Interfaz HID `0xFF05` / uso 1 (VID `0x373B`), reporte 8, paquetes de 63 bytes:
-
-```
-[checksum] [0x72] [largo de parámetros] [secuencia] [destino] [comando] [largo] [datos…]
-```
-
-El checksum es la suma de los demás bytes. El destino es 0 para el mouse por cable (PID 4814 o
-4882) y 1 para hablarle a través de su receptor. La respuesta repite el comando en el byte 4 y trae
-sus datos desde el 6.
-
-| Comando | Qué hace |
+| | |
 |---|---|
-| 9 | Configuración activa (0 a 3), polling rate |
-| 10 | Activa una configuración |
-| 7 / 15 | Batería / si está cargando |
-| 23 | Lee la memoria de la configuración activa: tabla de DPI en la dirección 1, modo del sensor en la 74 |
-| 177 | Funciones del mouse (dónde está el modo del sensor) |
+| **Clic** en el ícono | Vuelve a la configuración que usaste antes; la primera vez, alterna entre la 1 y la 2. |
+| **Clic derecho** | Abre el menú: conexión y batería, las cuatro configuraciones con lo que tiene cada una, «Abrir ATK HUB», «Iniciar con Windows» y Salir. |
+| **Teclado** | <kbd>Win</kbd> + <kbd>B</kbd> lleva a la bandeja; <kbd>Enter</kbd> cambia y la tecla de menú abre el menú. |
 
-`diagnostico.js` se pega en la consola del navegador (F12) con hub.atk.pro abierta y el mouse
-conectado ahí: solo lee, con los mismos comandos, y muestra lo que el mouse responde, para
-compararlo con la página o probar otro mouse ATK.
+El menú lee el mouse al abrirse:
+
+```text
+Inalámbrico · batería 90 %
+────────────────────────────────────────────────────────────
+  Configuración 1      1000 Hz · 1600 DPI · sensor básico
+● Configuración 2      4000 Hz · 1600 DPI · sensor competitivo
+  Configuración 3
+  Configuración 4
+────────────────────────────────────────────────────────────
+  Abrir ATK HUB
+  Iniciar con Windows
+  Salir
+```
+
+La configuración activa se lee en ese momento; las demás muestran lo que tenían la última vez que
+estuvieron activas.
+
+## Ligero por diseño
+
+Phantom Switch está hecho para no notarse.
+
+- **No escucha el mouse ni el teclado.** No se mete entre el mouse y tus juegos: a 8000 Hz, cada
+  movimiento llega a Windows como si el programa no existiera.
+- **En reposo no hace nada.** Cero uso de procesador y unos 2 MB de memoria.
+- **Le habla al mouse solo cuando hace falta:** al usar el ícono, al conectar o desconectar algo por
+  USB y, por el receptor, para revisar la batería cada 15 minutos.
+- **Nunca toca tus ajustes.** Lee, y su única escritura es la que hace ATK HUB al cambiar de
+  configuración. Envía cada pedido una sola vez, nunca dos cambios a la vez, y no reescribe la
+  configuración que ya está activa.
+
+> Usa ATK HUB o Phantom Switch, no los dos a la vez: el receptor atiende un pedido por vez y se
+> perderían respuestas.
+
+## Compatibilidad
+
+- **ATK Phantom Ultimate** con firmware BITMOUSE, por cable o con su receptor 8K. Es el modelo
+  probado; otros mouse de ATK con el mismo firmware podrían funcionar a través de su receptor.
+- **Windows 10 (1903 o posterior) y Windows 11.** Sin permisos de administrador.
+
+## Cómo funciona
+
+Phantom Switch habla con el mouse por HID, con los mismos pedidos que la página de ATK HUB, leídos
+de su código público. El protocolo está documentado en
+[`src/device/protocol.rs`](src/device/protocol.rs) y probado con respuestas reales del mouse:
+
+| Comando | Para qué |
+|---:|---|
+| `9` | Configuración activa y su polling rate |
+| `10` | Activar una configuración |
+| `7` · `15` | Batería · si está cargando |
+| `23` | Leer la memoria de la configuración activa: tabla de DPI y modo del sensor |
+| `177` | Funciones del mouse |
+
+El código está en Rust, sin dependencias más allá de las APIs de Windows:
+
+```text
+src/
+├── device/      el mouse: su protocolo (sin E/S, probado) y la E/S HID de Windows
+├── worker.rs    el hilo que le habla al mouse: la interfaz nunca lo espera
+├── app.rs       la interfaz y lo que se sabe del mouse
+├── tray.rs      el ícono junto al reloj
+├── menu.rs      su menú
+├── icon.rs      los íconos, dibujados al tamaño que pide Windows
+└── …            textos, tema oscuro, inicio con Windows
+```
 
 ## Compilar
 
-Con Rust (canal estable) en Windows:
+Con [Rust](https://rustup.rs) en Windows:
 
 ```bash
 cargo build --release
 ```
 
-O desde Linux/WSL con [`cargo-xwin`](https://github.com/rust-cross/cargo-xwin):
-`cargo xwin build --release`. El `.exe` queda en `target/x86_64-pc-windows-msvc/release/`.
+Desde Linux o WSL, con [`cargo-xwin`](https://github.com/rust-cross/cargo-xwin):
+`cargo xwin build --release`. El ejecutable queda en `target/x86_64-pc-windows-msvc/release/`.
 
-Cada versión se compila y publica sola en GitHub Actions al subir su etiqueta (`v0.1.0`…), desde
-este mismo código.
+Cada etiqueta `vX.Y.Z` publica su versión sola: GitHub Actions corre las pruebas, compila y la sube a
+Releases.
 
 ## Licencia
 
-[MIT](LICENSE).
+[MIT](LICENSE). Phantom Switch es un proyecto independiente, sin relación con ATK.
 
 ---
 
 ## In English
 
-A tiny Windows tray app (Rust, ~270 KB, no install) to switch the onboard profiles of the
-**ATK Phantom Ultimate** mouse without opening ATK HUB: click the tray icon to go back to the
-previous profile, right-click for a menu with the battery, connection type and each profile's
-polling rate, DPI and sensor mode. It warns when the battery drops below 15 % and 5 % (receiver
-only). It does not hook mouse or keyboard input and uses no CPU at rest; besides reads, the only
-command it sends is "activate profile N", the same packet ATK HUB sends. The interface is in
-Spanish. Not affiliated with ATK; tested with the BITMOUSE-firmware Phantom Ultimate, wired and
-with its 8K dongle. The HID protocol is documented above.
+**Phantom Switch** switches the onboard profiles of the **ATK Phantom Ultimate** mouse from the
+Windows tray, without opening ATK HUB. Click the icon to go back to your previous profile;
+right-click for the battery, the connection and each profile's polling rate, DPI and sensor mode,
+read from the mouse itself. It warns you before the battery runs out, follows Windows' dark mode
+and scaling, and can start with Windows.
+
+It is a single ~400 KB executable with no installer. It never hooks mouse or keyboard input, uses no
+CPU at rest, and besides reads it only sends the same "activate profile" packet ATK HUB sends. The
+interface is in Spanish. The HID protocol is documented in
+[`src/device/protocol.rs`](src/device/protocol.rs). Not affiliated with ATK.
