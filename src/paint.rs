@@ -22,6 +22,7 @@ pub struct Rgb(pub u8, pub u8, pub u8);
 
 impl Rgb {
     pub const WHITE: Rgb = Rgb(255, 255, 255);
+    pub const BLACK: Rgb = Rgb(0, 0, 0);
 
     /// This color moved `amount` (0 to 1) of the way to white.
     pub fn lighten(self, amount: f32) -> Rgb {
@@ -33,7 +34,8 @@ impl Rgb {
         Rgb(m(self.0, other.0), m(self.1, other.1), m(self.2, other.2))
     }
 
-    fn linear(self) -> [f32; 3] {
+    /// Its channels from 0 to 1.
+    fn unit(self) -> [f32; 3] {
         [self.0, self.1, self.2].map(|c| f32::from(c) / 255.0)
     }
 }
@@ -71,7 +73,7 @@ impl Text {
         // deselected before it is deleted and the context goes last.
         unsafe {
             let dc = Dc::new()?;
-            let font = Object(CreateFontW(
+            let font = GdiObject(CreateFontW(
                 -font.height,
                 0,
                 0,
@@ -94,7 +96,7 @@ impl Text {
             // A little room on the right: antialiasing reaches past the last advance.
             let (width, height) = (measured.right.max(1) as usize + 2, measured.bottom.max(1) as usize);
             let (bitmap, bits) = dib(width, height)?;
-            let bitmap = Object(bitmap);
+            let bitmap = GdiObject(bitmap);
             let _bitmap = Selected::new(&dc, bitmap.0)?;
             SetBkMode(dc.handle(), TRANSPARENT as i32);
             SetTextColor(dc.handle(), 0x00FF_FFFF);
@@ -149,7 +151,7 @@ impl Canvas {
                 let coverage =
                     rounded_rect_coverage(x as f32 - cx, y as f32 - cy, rect.width / 2.0, rect.height / 2.0, radius);
                 if coverage > 0.0 {
-                    self.blend(x, y, color.linear(), coverage * opacity);
+                    self.blend(x, y, color.unit(), coverage * opacity);
                 }
             }
         }
@@ -162,7 +164,7 @@ impl Canvas {
                 let ink = text.ink[ty * text.width + tx];
                 let (px, py) = (x + tx as isize, y + ty as isize);
                 if ink > 0 && (0..self.width as isize).contains(&px) && (0..self.height as isize).contains(&py) {
-                    self.blend(px as usize, py as usize, color.linear(), f32::from(ink) / 255.0);
+                    self.blend(px as usize, py as usize, color.unit(), f32::from(ink) / 255.0);
                 }
             }
         }
@@ -207,14 +209,14 @@ impl Canvas {
 
     pub fn icon(&self) -> Option<Icon> {
         let (color, bits) = dib(self.width, self.height)?;
-        let color = Object(color);
+        let color = GdiObject(color);
         let pixels = self.bgra(false);
         // SAFETY: `bits` has room for every pixel; Windows copies both bitmaps into the icon.
         unsafe {
             std::ptr::copy_nonoverlapping(pixels.as_ptr(), bits, pixels.len());
             // With alpha, Windows ignores the mask but still wants one: rows aligned to 16 bits.
             let mask_bits = vec![0u8; self.width.div_ceil(16) * 2 * self.height];
-            let mask = Object(CreateBitmap(self.width as i32, self.height as i32, 1, 1, mask_bits.as_ptr().cast()));
+            let mask = GdiObject(CreateBitmap(self.width as i32, self.height as i32, 1, 1, mask_bits.as_ptr().cast()));
             let info = ICONINFO { fIcon: 1, xHotspot: 0, yHotspot: 0, hbmMask: mask.0, hbmColor: color.0 };
             let icon = CreateIconIndirect(&info);
             (!icon.is_null()).then_some(Icon(icon))
@@ -222,9 +224,9 @@ impl Canvas {
     }
 
     /// A premultiplied 32-bit bitmap, as menus and layered windows take it.
-    pub fn bitmap(&self) -> Option<Bitmap> {
+    pub fn bitmap(&self) -> Option<GdiObject> {
         let (bitmap, bits) = dib(self.width, self.height)?;
-        let bitmap = Bitmap(bitmap);
+        let bitmap = GdiObject(bitmap);
         let pixels = self.bgra(true);
         // SAFETY: `bits` has room for every pixel.
         unsafe { std::ptr::copy_nonoverlapping(pixels.as_ptr(), bits, pixels.len()) };
@@ -265,22 +267,6 @@ impl Drop for Icon {
     }
 }
 
-/// A GDI bitmap, deleted when dropped.
-pub struct Bitmap(HBITMAP);
-
-impl Bitmap {
-    pub fn handle(&self) -> HBITMAP {
-        self.0
-    }
-}
-
-impl Drop for Bitmap {
-    fn drop(&mut self) {
-        // SAFETY: a bitmap created by `Canvas::bitmap`; whoever used it no longer selects it.
-        unsafe { DeleteObject(self.0) };
-    }
-}
-
 /// A 32-bit top-down DIB and its pixels; the caller puts the bitmap in a guard.
 fn dib(width: usize, height: usize) -> Option<(HBITMAP, *mut u8)> {
     // SAFETY: BITMAPINFO is plain data.
@@ -301,12 +287,19 @@ fn dib(width: usize, height: usize) -> Option<(HBITMAP, *mut u8)> {
     }
 }
 
-/// A GDI object, deleted when dropped.
-struct Object(HGDIOBJ);
+/// A GDI object (a bitmap, a font), deleted when dropped.
+pub struct GdiObject(HGDIOBJ);
 
-impl Drop for Object {
+impl GdiObject {
+    pub fn handle(&self) -> HGDIOBJ {
+        self.0
+    }
+}
+
+impl Drop for GdiObject {
     fn drop(&mut self) {
-        // SAFETY: an object created here and already deselected (`Selected` guards drop first).
+        // SAFETY: an object created here, owned by nobody else and no longer selected anywhere
+        // (`Selected` guards drop first; a menu that shows a bitmap is destroyed before it).
         unsafe { DeleteObject(self.0) };
     }
 }

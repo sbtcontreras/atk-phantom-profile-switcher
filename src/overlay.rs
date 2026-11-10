@@ -21,13 +21,12 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
+use crate::APP_ID;
 use crate::badge;
 use crate::device::Slot;
 use crate::paint::{Canvas, Dc, Font, Rect, Rgb, Selected, Text};
 use crate::theme;
 use crate::win::wide;
-
-const CLASS: &str = "PhantomSwitchOverlay";
 
 const FADE_IN: Duration = Duration::from_millis(120);
 const HOLD: Duration = Duration::from_millis(1500);
@@ -35,41 +34,40 @@ const FADE_OUT: Duration = Duration::from_millis(300);
 /// How often the fade advances (about 60 frames per second), only while it lasts.
 const FRAME_MS: u32 = 16;
 
-/// The panel's measures at 100 % scaling.
+// The panel's measures, in pixels at 100% scaling.
 const PADDING: f32 = 14.0;
 const BADGE: f32 = 32.0;
+/// Between the badge and the text.
 const GAP: f32 = 12.0;
+/// Between the title and the details.
 const LINE_GAP: f32 = 2.0;
 const RADIUS: f32 = 10.0;
+/// How far the shadow reaches around the panel.
 const SHADOW: f32 = 12.0;
+/// How far the shadow falls below the panel.
+const SHADOW_DROP: f32 = 2.0;
+/// The shadow is the panel's shape this many times, each larger and as faint as this.
+const SHADOW_STEPS: usize = 8;
+const SHADOW_STEP_OPACITY: f32 = 0.035;
 /// From the bottom of the work area (above the taskbar) to the panel.
 const MARGIN: f32 = 48.0;
 const TITLE_SIZE: f32 = 15.0;
 const DETAILS_SIZE: f32 = 13.0;
+/// The opacity of the panel's hairline border, in either theme.
+const BORDER_OPACITY: f32 = 0.10;
 
 /// The panel's colors for the dark and the light Windows theme.
 struct Palette {
     panel: Rgb,
     border: Rgb,
-    border_opacity: f32,
     title: Rgb,
     details: Rgb,
 }
 
-const DARK: Palette = Palette {
-    panel: Rgb(32, 32, 32),
-    border: Rgb(255, 255, 255),
-    border_opacity: 0.10,
-    title: Rgb(255, 255, 255),
-    details: Rgb(200, 200, 200),
-};
-const LIGHT: Palette = Palette {
-    panel: Rgb(249, 249, 249),
-    border: Rgb(0, 0, 0),
-    border_opacity: 0.10,
-    title: Rgb(26, 26, 26),
-    details: Rgb(96, 96, 96),
-};
+const DARK: Palette =
+    Palette { panel: Rgb(32, 32, 32), border: Rgb::WHITE, title: Rgb::WHITE, details: Rgb(200, 200, 200) };
+const LIGHT: Palette =
+    Palette { panel: Rgb(249, 249, 249), border: Rgb::BLACK, title: Rgb(26, 26, 26), details: Rgb(96, 96, 96) };
 
 pub struct Overlay {
     window: HWND,
@@ -84,7 +82,7 @@ impl Overlay {
         // until there is something to show.
         let window = unsafe {
             let instance = GetModuleHandleW(null());
-            let class = wide(CLASS);
+            let class = wide(&format!("{APP_ID}Overlay"));
             let window_class = WNDCLASSW {
                 lpfnWndProc: Some(DefWindowProcW),
                 hInstance: instance,
@@ -250,29 +248,28 @@ fn panel(slot: Slot, title: &str, details: &str, scale: f32, palette: &Palette) 
     let text_width = width_of(&title).max(width_of(&details));
     let text_height = height_of(&title) + if details.is_some() { px(LINE_GAP) + height_of(&details) } else { 0.0 };
     let (padding, badge_side, shadow) = (px(PADDING), px(BADGE), px(SHADOW));
+    let content_height = badge_side.max(text_height);
     let panel_width = padding + badge_side + px(GAP) + text_width + padding;
-    let panel_height = padding + badge_side.max(text_height) + padding;
+    let panel_height = padding + content_height + padding;
     let mut canvas = Canvas::new((panel_width + 2.0 * shadow) as usize, (panel_height + 2.0 * shadow) as usize);
     let rect = Rect { x: shadow, y: shadow, width: panel_width, height: panel_height };
 
     // A soft shadow: the panel's shape, larger and fainter, a little below it.
-    let steps = 8;
-    for step in (1..=steps).rev() {
-        let grow = shadow * step as f32 / steps as f32;
+    for step in (1..=SHADOW_STEPS).rev() {
+        let grow = shadow * step as f32 / SHADOW_STEPS as f32;
         let around = Rect {
             x: rect.x - grow,
-            y: rect.y - grow + px(2.0),
+            y: rect.y - grow + px(SHADOW_DROP),
             width: rect.width + 2.0 * grow,
             height: rect.height + 2.0 * grow,
         };
-        canvas.rounded_rect(around, px(RADIUS) + grow, Rgb(0, 0, 0), Rgb(0, 0, 0), 0.035);
+        canvas.rounded_rect(around, px(RADIUS) + grow, Rgb::BLACK, Rgb::BLACK, SHADOW_STEP_OPACITY);
     }
-    canvas.rounded_rect(rect, px(RADIUS), palette.border, palette.border, palette.border_opacity);
+    canvas.rounded_rect(rect, px(RADIUS), palette.border, palette.border, BORDER_OPACITY);
     let inner = Rect { x: rect.x + 1.0, y: rect.y + 1.0, width: rect.width - 2.0, height: rect.height - 2.0 };
     canvas.rounded_rect(inner, px(RADIUS) - 1.0, palette.panel, palette.panel, 1.0);
 
     let content_top = rect.y + padding;
-    let content_height = badge_side.max(text_height);
     let badge = badge::draw(Some(slot), badge_side as usize);
     canvas.draw(&badge, (rect.x + padding) as usize, (content_top + (content_height - badge_side) / 2.0) as usize);
     let text_x = (rect.x + padding + badge_side + px(GAP)) as isize;

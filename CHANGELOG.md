@@ -10,6 +10,11 @@ All notable changes to Phantom Switch. The format follows
 
 - A new icon for the app, in the ATK Phantom's own look: a fierce ghost shaped like the mouse, its bone-white shell in two panels with a gold seam and wheel, angular eyes and a hem of spikes, on a warm dark tile with a thin gold edge. The tray icon still shows the active profile's number.
 
+### Fixed
+
+- **Start with Windows** is checked only when Windows starts this very copy of the app: after moving `PhantomSwitch.exe`, it no longer shows as on while Windows looks for the old one.
+- The low-battery warnings come below 15% and below 5%, as described, rather than at 15% and 5%.
+
 ### Note
 
 This is a pre-release: every read is verified on a real ATK Phantom Ultimate (BITMOUSE firmware), wired and through its 8K receiver, but switching from the app is not yet.
@@ -33,19 +38,19 @@ This is a pre-release: every read is verified on a real ATK Phantom Ultimate (BI
 
 ## [0.2.0] - 2026-11-10
 
+### Added
+
+- A notification when a switch could not be made.
+
 ### Changed
 
 - The app is now **Phantom Switch** (`PhantomSwitch.exe`), with its own icon and version information.
 - Tray icons are sharp at any display scaling, and menus turn dark when Windows is dark.
 - The tray icon works from the keyboard: <kbd>Win</kbd> + <kbd>B</kbd>, <kbd>Enter</kbd> to switch and the menu key for the menu.
 
-### Added
-
-- A notification when a switch could not be made.
-
 ### Note
 
-Pre-release: every read is verified on a real ATK Phantom Ultimate (BITMOUSE firmware), wired and through its 8K receiver, but switching from the app is not yet.
+This is a pre-release: every read is verified on a real ATK Phantom Ultimate (BITMOUSE firmware), wired and through its 8K receiver, but switching from the app is not yet.
 
 ## [0.1.0] - 2026-11-10
 
@@ -58,7 +63,7 @@ Pre-release: every read is verified on a real ATK Phantom Ultimate (BITMOUSE fir
 
 ### Note
 
-Pre-release: every read is verified on a real ATK Phantom Ultimate (BITMOUSE firmware), wired and through its 8K receiver, but switching from the app is not yet.
+This is a pre-release: every read is verified on a real ATK Phantom Ultimate (BITMOUSE firmware), wired and through its 8K receiver, but switching from the app is not yet.
 
 [0.3.1]: https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases/tag/v0.3.1
 [0.3.0]: https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases/tag/v0.3.0

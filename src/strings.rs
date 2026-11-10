@@ -6,8 +6,6 @@ use windows_sys::Win32::Globalization::GetUserDefaultUILanguage;
 
 use crate::device::{Battery, Connection, Profile, Sensor, Slot};
 
-pub const APP_NAME: &str = "Phantom Switch";
-
 /// A non-breaking space, between a number and its unit.
 const NBSP: char = '\u{a0}';
 /// `LANG_SPANISH`, the primary language of every Spanish locale.
@@ -133,10 +131,10 @@ impl Lang {
         [polling, dpi, sensor].into_iter().flatten().collect::<Vec<_>>().join(" · ")
     }
 
-    /// Title and body of the low-battery notice for crossing `threshold`.
-    pub fn low_battery(self, threshold: u8, percent: u8) -> (String, &'static str) {
+    /// Title and body of the low-battery notice at `percent`; `critical` for the last warning.
+    pub fn low_battery(self, critical: bool, percent: u8) -> (String, &'static str) {
         let level = self.percent(percent);
-        if threshold <= 5 {
+        if critical {
             (
                 format!("{} {level}", self.pick("Batería casi agotada:", "Battery almost empty:")),
                 self.pick(
@@ -186,6 +184,11 @@ mod tests {
         let second = Slot::ALL[1];
         assert_eq!(Lang::Spanish.profile_name(second), "Configuración 2");
         assert_eq!(Lang::English.profile_name(second), "Profile 2");
-        assert_eq!(Lang::English.low_battery(5, 4).0, "Battery almost empty: 4%");
+    }
+
+    #[test]
+    fn the_last_battery_warning_says_it_is_almost_empty() {
+        assert_eq!(Lang::English.low_battery(true, 4).0, "Battery almost empty: 4%");
+        assert_eq!(Lang::Spanish.low_battery(false, 14).0, "Batería baja: 14\u{a0}%");
     }
 }

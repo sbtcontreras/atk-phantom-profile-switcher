@@ -2,12 +2,12 @@
   <title>Phantom Switch: the on-screen notice and the tray menu (illustration)</title>
   <defs>
     <clipPath id="frame"><rect width="1440" height="810" rx="18"/></clipPath>
-    <radialGradient id="bloom-blue" cx="78%" cy="74%" r="70%">
+    <radialGradient id="bloom-corner" cx="78%" cy="74%" r="70%">
       <stop offset="0" stop-color="#b07a3a" stop-opacity="0.8"/>
       <stop offset="0.55" stop-color="#5a3a1c" stop-opacity="0.35"/>
       <stop offset="1" stop-color="#0f0c09" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="bloom-violet" cx="18%" cy="22%" r="62%">
+    <radialGradient id="bloom-top" cx="18%" cy="22%" r="62%">
       <stop offset="0" stop-color="#8a6a48" stop-opacity="0.7"/>
       <stop offset="0.6" stop-color="#3d2c1c" stop-opacity="0.25"/>
       <stop offset="1" stop-color="#0f0c09" stop-opacity="0"/>
@@ -16,10 +16,10 @@
       <stop offset="0" stop-color="#f2e3c4" stop-opacity="0.45"/>
       <stop offset="1" stop-color="#cca35c" stop-opacity="0"/>
     </linearGradient>
-    <linearGradient id="b1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a8af0"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
-    <linearGradient id="b2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e35b5b"/><stop offset="1" stop-color="#dc2626"/></linearGradient>
-    <linearGradient id="b3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#47b070"/><stop offset="1" stop-color="#16a34a"/></linearGradient>
-    <linearGradient id="b4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#df8a31"/><stop offset="1" stop-color="#d97706"/></linearGradient>
+    <linearGradient id="b1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4c7fef"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
+    <linearGradient id="b2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e24d4d"/><stop offset="1" stop-color="#dc2626"/></linearGradient>
+    <linearGradient id="b3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#40b46b"/><stop offset="1" stop-color="#16a34a"/></linearGradient>
+    <linearGradient id="b4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e08f33"/><stop offset="1" stop-color="#d97706"/></linearGradient>
     <filter id="shadow" x="-20%" y="-30%" width="140%" height="170%">
       <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#000" flood-opacity="0.45"/>
     </filter>
@@ -30,8 +30,8 @@
   <g clip-path="url(#frame)">
     <!-- Wallpaper -->
     <rect width="1440" height="810" fill="#0f0c09"/>
-    <rect width="1440" height="810" fill="url(#bloom-violet)"/>
-    <rect width="1440" height="810" fill="url(#bloom-blue)"/>
+    <rect width="1440" height="810" fill="url(#bloom-top)"/>
+    <rect width="1440" height="810" fill="url(#bloom-corner)"/>
     <path d="M -80 640 C 260 420, 560 520, 820 300 S 1300 60, 1560 180 L 1560 260 C 1280 160, 1060 320, 860 430 S 300 640, -80 760 Z" fill="url(#ribbon)" filter="url(#soft)"/>
 
     <!-- PhantomSwitch.exe on the desktop (drawn by tools/icon) -->

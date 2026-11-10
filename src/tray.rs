@@ -72,7 +72,7 @@ impl Tray {
         self.added = false;
     }
 
-    /// The side of a small icon at the screen's scaling: 16 px at 100 %, 24 at 150 %…
+    /// The side of a small icon at the screen's scaling: 16 px at 100%, 24 at 150%…
     pub fn icon_size(&self) -> usize {
         // SAFETY: the window is this program's.
         let side = unsafe { GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForWindow(self.window)) };

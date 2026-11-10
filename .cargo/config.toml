@@ -3,5 +3,7 @@
 [build]
 target = "x86_64-pc-windows-msvc"
 
+# `/ignore:4099`: the static C runtime comes without its debug information, and the linker would
+# warn about it once per object.
 [target.x86_64-pc-windows-msvc]
 rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=/ignore:4099"]

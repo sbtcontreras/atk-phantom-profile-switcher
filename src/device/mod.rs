@@ -6,7 +6,7 @@ mod protocol;
 
 use std::time::Duration;
 
-use protocol::{FEATURE_FPS_13K, REPORT_ID, Request, Route};
+use protocol::{FEATURE_FPS_13K, REPORT_ID, Request};
 pub use protocol::{Sensor, Slot};
 
 /// Vendors of ATK's interfaces.
@@ -14,7 +14,7 @@ const VENDORS: [u16; 2] = [0x373B, 0x3554];
 /// The command interface of BITMOUSE mice: usage page and usage.
 const INTERFACE: (u16, u16) = (0xFF05, 1);
 /// The wired Phantom; any other product with that interface is a receiver.
-const WIRED: [u16; 2] = [4814, 4882];
+const WIRED: [u16; 2] = [0x12CE, 0x1312];
 /// How long an answer is waited for (the receiver takes longer than the cable).
 const ANSWER_WAIT: Duration = Duration::from_millis(1500);
 
@@ -24,6 +24,7 @@ pub struct Disconnected;
 
 pub type Result<T> = std::result::Result<T, Disconnected>;
 
+/// How the mouse is reached: by its cable, or through its receiver.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Connection {
     Wired,
@@ -55,7 +56,7 @@ pub struct Snapshot {
 
 pub struct Phantom {
     link: hid::Link,
-    route: Route,
+    connection: Connection,
     /// Whether the sensor mode is in the profile's memory (from the mouse's features, asked once
     /// per connection).
     sensor_in_memory: Option<bool>,
@@ -69,17 +70,15 @@ impl Phantom {
             .filter(|i| VENDORS.contains(&i.vendor) && (i.usage_page, i.usage) == INTERFACE)
             .filter(|i| i.output_len > protocol::PACKET_LEN)
             .find_map(|interface| {
-                let route = if WIRED.contains(&interface.product) { Route::Wired } else { Route::Receiver };
-                let mut phantom = Phantom { link: hid::Link::open(&interface)?, route, sensor_in_memory: None };
+                let connection =
+                    if WIRED.contains(&interface.product) { Connection::Wired } else { Connection::Wireless };
+                let mut phantom = Phantom { link: hid::Link::open(&interface)?, connection, sensor_in_memory: None };
                 matches!(phantom.active_slot(), Ok(Some(_))).then_some(phantom)
             })
     }
 
     pub fn connection(&self) -> Connection {
-        match self.route {
-            Route::Wired => Connection::Wired,
-            Route::Receiver => Connection::Wireless,
-        }
+        self.connection
     }
 
     /// The active profile, or `None` if the mouse did not answer.
@@ -135,8 +134,7 @@ impl Phantom {
 
     /// Makes a request and returns its answer's data.
     fn ask(&mut self, request: Request) -> Result<Option<Vec<u8>>> {
-        let packet = request.packet(self.route);
-        let report = self.link.exchange(REPORT_ID, &packet, ANSWER_WAIT, |r| request.answer(r).is_some())?;
-        Ok(report.and_then(|report| request.answer(&report).map(<[u8]>::to_vec)))
+        let packet = request.packet(self.connection);
+        self.link.exchange(REPORT_ID, &packet, ANSWER_WAIT, |report| request.answer(report).map(<[u8]>::to_vec))
     }
 }

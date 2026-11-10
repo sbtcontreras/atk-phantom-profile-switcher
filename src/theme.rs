@@ -5,9 +5,13 @@
 //! exported by number alone (135 `SetPreferredAppMode` and 136 `FlushMenuThemes`, since Windows 10
 //! 1903), the ones many apps use. Without them, menus stay light and nothing else changes.
 
+use std::sync::OnceLock;
+
+use windows_sys::Win32::Foundation::HMODULE;
 use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 
-use crate::win::{user_dword, wide};
+use crate::registry;
+use crate::win::wide;
 
 const SET_PREFERRED_APP_MODE: usize = 135;
 const FLUSH_MENU_THEMES: usize = 136;
@@ -38,7 +42,7 @@ pub fn refresh() {
 /// Whether the taskbar and flyouts are light (Settings › Personalization › Colors).
 /// Without the value, Windows' default: dark.
 pub fn light_shell() -> bool {
-    user_dword(PERSONALIZE, "SystemUsesLightTheme").is_some_and(|light| light != 0)
+    registry::dword(PERSONALIZE, "SystemUsesLightTheme").is_some_and(|light| light != 0)
 }
 
 /// The function of `uxtheme.dll` exported as number `ordinal`.
@@ -46,8 +50,7 @@ pub fn light_shell() -> bool {
 /// # Safety
 /// `F` must be that function's signature.
 unsafe fn export<F: Copy>(ordinal: usize) -> Option<F> {
-    // SAFETY: loads uxtheme, which stays loaded for the life of the process.
-    let module = unsafe { LoadLibraryW(wide("uxtheme.dll").as_ptr()) };
+    let module = uxtheme();
     if module.is_null() {
         return None;
     }
@@ -55,4 +58,11 @@ unsafe fn export<F: Copy>(ordinal: usize) -> Option<F> {
     let function = unsafe { GetProcAddress(module, ordinal as *const u8) }?;
     // SAFETY: by contract `F` is the function's signature, a pointer-sized function pointer.
     Some(unsafe { std::mem::transmute_copy(&function) })
+}
+
+/// `uxtheme.dll`, loaded once and kept for the life of the process (null if it is missing).
+fn uxtheme() -> HMODULE {
+    static MODULE: OnceLock<usize> = OnceLock::new();
+    // SAFETY: a NUL-terminated name; the module is never freed, so its address stays valid.
+    *MODULE.get_or_init(|| unsafe { LoadLibraryW(wide("uxtheme.dll").as_ptr()) } as usize) as HMODULE
 }

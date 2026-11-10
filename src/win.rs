@@ -1,16 +1,14 @@
 //! What any part that talks to Windows needs.
 
-use std::mem::size_of;
 use std::os::windows::io::{FromRawHandle, OwnedHandle};
 use std::ptr::{null, null_mut};
 
-use windows_sys::Win32::Foundation::{ERROR_ALREADY_EXISTS, ERROR_SUCCESS, GetLastError};
-use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
+use windows_sys::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError};
 use windows_sys::Win32::System::Threading::CreateMutexW;
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MB_ICONINFORMATION, MB_OK, MessageBoxW, SW_SHOWNORMAL};
 
-use crate::strings::APP_NAME;
+use crate::APP_NAME;
 
 /// `text` as NUL-terminated UTF-16.
 pub fn wide(text: &str) -> Vec<u16> {
@@ -23,25 +21,6 @@ pub fn fill(field: &mut [u16], text: &str) {
     let units: Vec<u16> = text.encode_utf16().take(room).collect();
     field[..units.len()].copy_from_slice(&units);
     field[units.len()..].fill(0);
-}
-
-/// The DWORD `name` under `HKEY_CURRENT_USER\path`, if it is there.
-pub fn user_dword(path: &str, name: &str) -> Option<u32> {
-    let mut value = 0u32;
-    let mut size = size_of::<u32>() as u32;
-    // SAFETY: NUL-terminated strings; reads a DWORD into `value`, with its size.
-    let read = unsafe {
-        RegGetValueW(
-            HKEY_CURRENT_USER,
-            wide(path).as_ptr(),
-            wide(name).as_ptr(),
-            RRF_RT_REG_DWORD,
-            null_mut(),
-            (&raw mut value).cast(),
-            &mut size,
-        )
-    };
-    (read == ERROR_SUCCESS).then_some(value)
 }
 
 /// One running copy at a time: while it exists, another copy cannot get it.

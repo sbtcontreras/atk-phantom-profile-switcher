@@ -8,7 +8,7 @@ use std::ptr::{null, null_mut};
 
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows_sys::Win32::UI::Shell::NIN_SELECT;
+use windows_sys::Win32::UI::Shell::{NIN_SELECT, NINF_KEY};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DBT_DEVNODES_CHANGED, DefWindowProcW, DispatchMessageW, GetMessageW, KillTimer, MSG, PostMessageW,
     PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SetTimer, TranslateMessage, WM_APP, WM_CLOSE,
@@ -19,16 +19,16 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 use crate::device::{Battery, Connection, Profile, Slot};
 use crate::menu::{self, Choice, Model};
 use crate::overlay::Overlay;
-use crate::strings::{self, APP_NAME, Lang};
+use crate::strings::{self, Lang};
 use crate::tray::Tray;
 use crate::win::{open_url, wide};
-use crate::worker::{self, Outcome, Report, Request, Worker, back_from};
-use crate::{settings, theme};
+use crate::worker::{self, Job, Outcome, Reply, Worker, back_from};
+use crate::{APP_ID, APP_NAME, settings, theme};
 
 const WM_TRAY: u32 = WM_APP + 1;
-const WM_REPORT: u32 = WM_APP + 2;
-/// Enter or Space on the icon (`NIN_SELECT | NINF_KEY`).
-const NIN_KEYSELECT: u32 = NIN_SELECT | 1;
+const WM_REPLY: u32 = WM_APP + 2;
+/// Enter or Space on the icon.
+const NIN_KEYSELECT: u32 = NIN_SELECT | NINF_KEY;
 
 const TIMER_DEVICES: usize = 1;
 const TIMER_BATTERY: usize = 2;
@@ -40,7 +40,6 @@ const BATTERY_EVERY_MS: u32 = 15 * 60 * 1000;
 const LOW_BATTERY: [u8; 2] = [15, 5];
 
 const HUB_URL: &str = "https://hub.atk.pro/";
-const CLASS: &str = "PhantomSwitch";
 
 thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
@@ -52,7 +51,7 @@ pub fn run() {
     // SAFETY: Win32 calls with NUL-terminated strings that live through each call.
     let window = unsafe {
         let instance = GetModuleHandleW(null());
-        let class = wide(CLASS);
+        let class = wide(APP_ID);
         let window_class = WNDCLASSW {
             lpfnWndProc: Some(window_proc),
             hInstance: instance,
@@ -92,10 +91,10 @@ unsafe extern "system" fn window_proc(window: HWND, message: u32, wparam: WPARAM
             let anchor = POINT { x: i32::from(wparam as u16 as i16), y: i32::from((wparam >> 16) as u16 as i16) };
             with_app(|app| app.on_tray(lparam as u32 & 0xFFFF, anchor));
         }
-        WM_REPORT => {
-            // SAFETY: only the mouse thread sends this message, once per result.
-            let report = unsafe { worker::take_report(lparam) };
-            if with_app(|app| app.on_report(*report)) == Some(true) {
+        WM_REPLY => {
+            // SAFETY: only the mouse thread sends this message, once per reply.
+            let reply = unsafe { worker::take_reply(lparam) };
+            if with_app(|app| app.on_reply(*reply)) == Some(true) {
                 show_menu(window);
             }
         }
@@ -141,7 +140,7 @@ fn show_menu(window: HWND) {
     with_app(|app| app.menu_open = false);
     match choice {
         Some(Choice::Activate(slot)) => {
-            with_app(|app| app.activate(slot));
+            with_app(|app| app.switch(Job::Activate(slot)));
         }
         Some(Choice::OpenHub) => open_url(HUB_URL),
         Some(Choice::ToggleOverlay) => settings::set_shows_overlay(!model.shows_overlay),
@@ -161,7 +160,7 @@ struct Mouse {
     connection: Option<Connection>,
     battery: Option<Battery>,
     /// What each profile had the last time it was active.
-    profiles: [Option<Profile>; 4],
+    profiles: [Option<Profile>; Slot::ALL.len()],
 }
 
 impl Mouse {
@@ -209,7 +208,7 @@ impl App {
             lang: strings::ui(),
             tray: Tray::new(window, WM_TRAY),
             overlay: Overlay::new(),
-            worker: Worker::spawn(window, WM_REPORT),
+            worker: Worker::spawn(window, WM_REPLY),
             mouse: Mouse::default(),
             previous: None,
             switching: false,
@@ -221,17 +220,17 @@ impl App {
 
     fn start(&mut self) {
         self.show();
-        self.worker.send(Request::Refresh);
+        self.worker.send(Job::Refresh);
         // SAFETY: this window's timer.
         unsafe { SetTimer(self.window, TIMER_BATTERY, BATTERY_EVERY_MS, None) };
     }
 
     fn on_tray(&mut self, event: u32, anchor: POINT) {
         match event {
-            NIN_SELECT | NIN_KEYSELECT => self.switch(Request::Back { previous: self.previous }),
+            NIN_SELECT | NIN_KEYSELECT => self.switch(Job::Back { previous: self.previous }),
             WM_CONTEXTMENU if !self.menu_open => {
                 self.menu_at = anchor;
-                self.worker.send(Request::Menu);
+                self.worker.send(Job::Menu);
             }
             _ => {}
         }
@@ -241,9 +240,9 @@ impl App {
         match timer {
             TIMER_DEVICES => {
                 self.kill_timer(TIMER_DEVICES);
-                self.worker.send(Request::Refresh);
+                self.worker.send(Job::Refresh);
             }
-            TIMER_BATTERY => self.worker.send(Request::Battery),
+            TIMER_BATTERY => self.worker.send(Job::Battery),
             // The notice is over: no more frames.
             TIMER_OVERLAY if !self.overlay.as_mut().is_some_and(Overlay::tick) => self.kill_timer(TIMER_OVERLAY),
             _ => {}
@@ -255,27 +254,21 @@ impl App {
         unsafe { KillTimer(self.window, timer) };
     }
 
-    fn activate(&mut self, slot: Slot) {
-        if self.mouse.slot() != Some(slot) {
-            self.switch(Request::Activate(slot));
-        }
-    }
-
-    fn switch(&mut self, request: Request) {
+    fn switch(&mut self, job: Job) {
         if !self.switching {
             self.switching = true;
-            self.worker.send(request);
+            self.worker.send(job);
         }
     }
 
-    /// Applies a result; `true` if the menu must open.
-    fn on_report(&mut self, report: Report) -> bool {
+    /// Applies a reply; `true` if the menu must open.
+    fn on_reply(&mut self, reply: Reply) -> bool {
         let lang = self.lang;
-        let switch = matches!(report.request, Request::Back { .. } | Request::Activate(_));
+        let switch = reply.job.switches();
         if switch {
             self.switching = false;
         }
-        match report.outcome {
+        match reply.outcome {
             Outcome::NotFound => {
                 self.mouse = Mouse { seen: Seen::NotFound, profiles: self.mouse.profiles, ..Mouse::default() };
                 if switch {
@@ -307,7 +300,7 @@ impl App {
         }
         self.show();
         self.warn_low_battery();
-        matches!(report.request, Request::Menu) && !self.menu_open
+        matches!(reply.job, Job::Menu) && !self.menu_open
     }
 
     /// The on-screen notice of a switch, unless the user turned it off.
@@ -361,20 +354,21 @@ impl App {
         let (warned, notice) = low_battery_notice(self.mouse.battery, self.warned);
         self.warned = warned;
         if let (Some(threshold), Some(battery)) = (notice, self.mouse.battery) {
-            let (title, body) = self.lang.low_battery(threshold, battery.percent);
+            let critical = Some(&threshold) == LOW_BATTERY.last();
+            let (title, body) = self.lang.low_battery(critical, battery.percent);
             self.tray.warn(&title, body);
         }
     }
 }
 
 /// The warning due with this battery: (the lowest warning already shown, the one to show).
-/// Each threshold warns once per discharge; charging or recovering starts them over.
+/// Each threshold warns once per discharge, below it; charging or recovering starts them over.
 fn low_battery_notice(battery: Option<Battery>, warned: Option<u8>) -> (Option<u8>, Option<u8>) {
     let Some(Battery { percent, charging }) = battery else { return (warned, None) };
-    if charging || percent > LOW_BATTERY[0] {
+    if charging || percent >= LOW_BATTERY[0] {
         return (None, None);
     }
-    match LOW_BATTERY.iter().copied().filter(|t| percent <= *t).min() {
+    match LOW_BATTERY.iter().copied().filter(|t| percent < *t).min() {
         Some(threshold) if warned.is_none_or(|w| threshold < w) => (Some(threshold), Some(threshold)),
         _ => (warned, None),
     }
@@ -398,6 +392,12 @@ mod tests {
             notices.extend(notice);
         }
         assert_eq!(notices, [15, 5]);
+    }
+
+    #[test]
+    fn at_a_threshold_it_does_not_warn_yet() {
+        assert_eq!(low_battery_notice(battery(15, false), None), (None, None));
+        assert_eq!(low_battery_notice(battery(5, false), Some(15)), (Some(15), None));
     }
 
     #[test]

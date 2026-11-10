@@ -1,17 +1,17 @@
-//! The thread that talks to the mouse. It is the only one that touches it: it takes requests
-//! from the interface, serves them one at a time and sends each result back as a message to the
-//! interface's window.
+//! The thread that talks to the mouse. It is the only one that touches it: it takes jobs from the
+//! interface, does them one at a time and sends each reply back as a message to the interface's
+//! window.
 
 use std::sync::mpsc::{Receiver, Sender, channel};
 
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW;
 
-use crate::device::{Battery, Connection, Disconnected, Phantom, Slot, Snapshot};
+use crate::device::{self, Battery, Connection, Disconnected, Phantom, Slot, Snapshot};
 
 /// What the interface asks of the mouse.
 #[derive(Clone, Copy, Debug)]
-pub enum Request {
+pub enum Job {
     /// Read what it has.
     Refresh,
     /// Read what it has, to open the menu.
@@ -25,10 +25,16 @@ pub enum Request {
     Battery,
 }
 
-/// What comes back from a request.
+impl Job {
+    pub fn switches(self) -> bool {
+        matches!(self, Job::Back { .. } | Job::Activate(_))
+    }
+}
+
+/// What comes back from a job.
 #[derive(Debug)]
-pub struct Report {
-    pub request: Request,
+pub struct Reply {
+    pub job: Job,
     pub outcome: Outcome,
 }
 
@@ -49,66 +55,58 @@ pub enum Outcome {
 
 /// The interface's end of the thread.
 pub struct Worker {
-    requests: Sender<Request>,
+    jobs: Sender<Job>,
 }
 
 impl Worker {
-    /// Starts the thread; its results reach `window` as message `message`, with a `Box<Report>`
-    /// in `lParam` (see `take_report`).
+    /// Starts the thread; its replies reach `window` as message `message`, with a `Box<Reply>` in
+    /// `lParam` (see `take_reply`).
     pub fn spawn(window: HWND, message: u32) -> Worker {
-        let (requests, receiver) = channel();
+        let (jobs, receiver) = channel();
         let window = window as isize;
         std::thread::spawn(move || run(&receiver, window, message));
-        Worker { requests }
+        Worker { jobs }
     }
 
-    pub fn send(&self, request: Request) {
+    pub fn send(&self, job: Job) {
         // The thread lives as long as the program: a send cannot fail while there is a window.
-        let _ = self.requests.send(request);
+        let _ = self.jobs.send(job);
     }
 }
 
-/// The `Report` that came in the `lParam` of the results message.
+/// The `Reply` that came in the `lParam` of the replies message.
 ///
 /// # Safety
 /// `lparam` must be that of a message sent by this thread, and be taken only once.
-pub unsafe fn take_report(lparam: isize) -> Box<Report> {
-    // SAFETY: by contract, a `Box<Report>` handed over with `Box::into_raw`.
-    unsafe { Box::from_raw(lparam as *mut Report) }
+pub unsafe fn take_reply(lparam: isize) -> Box<Reply> {
+    // SAFETY: by contract, a `Box<Reply>` handed over with `Box::into_raw`.
+    unsafe { Box::from_raw(lparam as *mut Reply) }
 }
 
-fn run(receiver: &Receiver<Request>, window: isize, message: u32) {
+fn run(receiver: &Receiver<Job>, window: isize, message: u32) {
     let mut mouse: Option<Phantom> = None;
-    for request in receiver {
-        let Some(outcome) = serve(&mut mouse, request) else { continue };
-        let report = Box::into_raw(Box::new(Report { request, outcome }));
+    for job in receiver {
+        let outcome = match job {
+            Job::Battery => battery(&mut mouse),
+            Job::Refresh | Job::Menu | Job::Back { .. } | Job::Activate(_) => Some(read(&mut mouse, job)),
+        };
+        let Some(outcome) = outcome else { continue };
+        let reply = Box::into_raw(Box::new(Reply { job, outcome }));
         // SAFETY: the window lives while the program runs; if the message is not delivered, the
-        // `Report` is taken back here and dropped.
-        if unsafe { PostMessageW(window as HWND, message, 0, report as isize) } == 0 {
-            // SAFETY: `report` comes from `Box::into_raw` and nobody else received it.
-            drop(unsafe { Box::from_raw(report) });
+        // `Reply` is taken back here and dropped.
+        if unsafe { PostMessageW(window as HWND, message, 0, reply as isize) } == 0 {
+            // SAFETY: `reply` comes from `Box::into_raw` and nobody else received it.
+            drop(unsafe { Box::from_raw(reply) });
         }
     }
 }
 
-/// Serves a request; `None` when there is nothing to tell (the battery without the receiver).
-fn serve(mouse: &mut Option<Phantom>, request: Request) -> Option<Outcome> {
-    if let Request::Battery = request {
-        let phantom = mouse.as_mut().filter(|m| m.connection() == Connection::Wireless)?;
-        return match phantom.battery() {
-            Ok(battery) => battery.map(Outcome::Battery),
-            Err(Disconnected) => {
-                *mouse = None;
-                Some(Outcome::NotFound)
-            }
-        };
-    }
-    if mouse.is_none() {
-        *mouse = Phantom::find();
-    }
-    let Some(phantom) = mouse.as_mut() else { return Some(Outcome::NotFound) };
-    match carry_out(phantom, request) {
-        Ok(outcome) => Some(outcome),
+/// The battery, through the receiver of a mouse already found; `None` when there is nothing to
+/// tell.
+fn battery(mouse: &mut Option<Phantom>) -> Option<Outcome> {
+    let phantom = mouse.as_mut().filter(|m| m.connection() == Connection::Wireless)?;
+    match phantom.battery() {
+        Ok(battery) => battery.map(Outcome::Battery),
         Err(Disconnected) => {
             *mouse = None;
             Some(Outcome::NotFound)
@@ -116,13 +114,27 @@ fn serve(mouse: &mut Option<Phantom>, request: Request) -> Option<Outcome> {
     }
 }
 
-/// Switches if the request asks for it, then reads what the mouse has.
-fn carry_out(phantom: &mut Phantom, request: Request) -> crate::device::Result<Outcome> {
-    let target = match request {
-        Request::Refresh | Request::Menu | Request::Battery => None,
+/// Finds the mouse if needed, switches if `job` asks for it, then reads what the mouse has.
+fn read(mouse: &mut Option<Phantom>, job: Job) -> Outcome {
+    if mouse.is_none() {
+        *mouse = Phantom::find();
+    }
+    let Some(phantom) = mouse.as_mut() else { return Outcome::NotFound };
+    match switch_and_read(phantom, job) {
+        Ok(outcome) => outcome,
+        Err(Disconnected) => {
+            *mouse = None;
+            Outcome::NotFound
+        }
+    }
+}
+
+fn switch_and_read(phantom: &mut Phantom, job: Job) -> device::Result<Outcome> {
+    let target = match job {
         // Already active: the mouse is not written what it already has.
-        Request::Activate(slot) => (phantom.active_slot()? != Some(slot)).then_some(slot),
-        Request::Back { previous } => phantom.active_slot()?.map(|active| back_from(active, previous)),
+        Job::Activate(slot) => (phantom.active_slot()? != Some(slot)).then_some(slot),
+        Job::Back { previous } => phantom.active_slot()?.map(|active| back_from(active, previous)),
+        Job::Refresh | Job::Menu | Job::Battery => None,
     };
     let switched = match target {
         Some(slot) => Some(phantom.activate(slot)?),

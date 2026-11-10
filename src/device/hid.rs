@@ -71,15 +71,15 @@ impl Link {
         })
     }
 
-    /// Sends `packet` as report `report_id` and returns the first input report that `is_answer`
-    /// accepts (without the report number), or `None` if none arrives within `wait`.
-    pub fn exchange(
+    /// Sends `packet` as report `report_id` and returns what `answer` makes of the first input
+    /// report it takes (without the report number), or `None` if none arrives within `wait`.
+    pub fn exchange<T>(
         &mut self,
         report_id: u8,
         packet: &[u8],
         wait: Duration,
-        is_answer: impl Fn(&[u8]) -> bool,
-    ) -> Result<Option<Vec<u8>>, Disconnected> {
+        answer: impl Fn(&[u8]) -> Option<T>,
+    ) -> Result<Option<T>, Disconnected> {
         // SAFETY: a handle opened by `open`. Drops old answers left in the queue.
         unsafe { HidD_FlushQueue(self.raw()) };
         let mut report = vec![0u8; self.output_len.max(packet.len() + 1)];
@@ -96,9 +96,8 @@ impl Link {
             }
             if let Some(read) = self.read(&mut buffer, left)? {
                 // Windows puts the report number first.
-                let report = &buffer[1..read.max(1)];
-                if is_answer(report) {
-                    return Ok(Some(report.to_vec()));
+                if let Some(answer) = answer(&buffer[1..read.max(1)]) {
+                    return Ok(Some(answer));
                 }
             }
         }
@@ -158,13 +157,6 @@ impl Link {
             }
             Ok(Some(done as usize))
         }
-    }
-}
-
-impl Drop for Link {
-    fn drop(&mut self) {
-        // SAFETY: cancels anything pending before the handle is closed.
-        unsafe { CancelIoEx(self.raw(), null()) };
     }
 }
 

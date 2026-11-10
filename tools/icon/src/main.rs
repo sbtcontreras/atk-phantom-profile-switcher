@@ -3,11 +3,11 @@
 //! a gold seam and wheel, angular eyes, a hem of spikes) on a rounded square of warm dark with a
 //! light from above and a thin gold edge.
 //!
-//! Run from the repository's root, `cargo run -p icon` writes:
+//! `cargo run -p icon` writes:
 //!
 //! - `assets/icon.ico`, the `.exe`'s icon, a bitmap per size (small sizes leave out the details);
 //! - `assets/icon.svg`, the same drawing in vectors, for the README;
-//! - the desktop icon of `docs/preview.svg`, between its `<!-- icon -->` marks.
+//! - the desktop icon of `assets/preview.svg`, between its `<!-- icon -->` marks.
 //!
 //! Coordinates go from 0 to 1 across the icon, top to bottom.
 
@@ -17,73 +17,94 @@ use std::path::Path;
 
 /// The sides of the `.exe`'s icon: from file lists to Explorer's large icons.
 const SIZES: [usize; 8] = [16, 20, 24, 32, 40, 48, 64, 128];
-/// Below this side the edge, the seam and the wheel would be a smudge: the ghost keeps its eyes.
+/// Below this side the edge, the seam, the wheel and the shadow would be a smudge: the ghost keeps
+/// only its eyes.
 const DETAILS_FROM: usize = 32;
-/// Below this side the wheel's knurl would be.
+/// Below this side the wheel's knurl would be a smudge: the wheel stays plain gold.
 const KNURL_FROM: usize = 64;
 /// Samples per pixel along each axis.
 const SAMPLES: usize = 4;
 
+// The colors: the mouse's bone-white shell and gold details, in warm dark light.
 const BONE: [f32; 3] = [0.95, 0.92, 0.86];
 /// The right half of the shell, a shade darker, as a second panel catching less light.
 const BONE_SHADE: [f32; 3] = [0.86, 0.82, 0.74];
 const GOLD: [f32; 3] = [0.8, 0.64, 0.36];
+/// The knurl's ridges.
 const GOLD_DARK: [f32; 3] = [0.55, 0.42, 0.22];
 const EYES: [f32; 3] = [0.09, 0.075, 0.06];
+/// The background, from its top to its bottom.
 const BACK_TOP: [f32; 3] = [0.2, 0.18, 0.15];
 const BACK_BOTTOM: [f32; 3] = [0.075, 0.065, 0.055];
 const LIGHT: [f32; 3] = [0.45, 0.39, 0.29];
 
-/// The rounded square: its half side and corner radius.
+// The rounded square.
 const SQUARE_HALF: f32 = 0.47;
 const SQUARE_RADIUS: f32 = 0.22;
-/// The gold edge: how much of the background it tints, and its width once a pixel is narrower.
+/// How much the gold edge tints the background under it.
 const EDGE_TINT: f32 = 0.6;
+/// The gold edge's width, once a pixel is narrower.
 const EDGE: f32 = 0.012;
-/// The light from above, as in the room the mouse sits in: its center (above the icon), how much
-/// flatter it is than it is wide, its reach and its strength.
+
+// The light from above, as in the room the mouse sits in.
+/// Its center, above the icon.
 const LIGHT_CENTER: (f32, f32) = (0.5, -0.05);
+/// How much flatter than wide it is.
 const LIGHT_FLATTEN: f32 = 1.2;
+/// How far from its center it fades out.
 const LIGHT_REACH: f32 = 0.8;
+/// How much it tints the background at its center.
 const LIGHT_STRENGTH: f32 = 0.45;
-/// The soft shadow under the ghost, as if it floated: its center, radii and darkness.
+
+// The soft shadow under the ghost, as if it floated.
 const SHADOW_CENTER: (f32, f32) = (0.5, 0.875);
 const SHADOW_RADII: (f32, f32) = (0.22, 0.03);
+/// How much it darkens what is under it at its center.
 const SHADOW_DARKNESS: f32 = 0.45;
-/// The ghost: the mouse's round front down to `ARCH`, sides that widen like a cape down to `HEM`,
-/// and three spikes, the middle one longest.
+
+// The ghost: the mouse's round front down to `ARCH`, sides that widen like a cape down to `HEM`,
+// and three spikes, the middle one longest.
 const ARCH: f32 = 0.45;
+/// The front's radius: half the width at `ARCH`.
 const ARCH_HALF: f32 = 0.22;
 const HEM: f32 = 0.69;
+/// Half the width at `HEM`.
 const HEM_HALF: f32 = 0.27;
+/// The middle spike's length below `HEM`.
 const SPIKE: f32 = 0.16;
+/// The outer spikes' length, as a share of the middle one's.
 const OUTER_SPIKE: f32 = 0.8;
-/// The seam between the buttons: its half width, at least a pixel, and where it ends.
+
+// The seam between the buttons.
+/// Its half width, once a pixel is narrower.
 const SEAM_HALF: f32 = 0.009;
+/// Where it ends, going down from the top of the front.
 const SEAM_END: f32 = 0.4;
-/// The wheel: its center, half sides and radius, and the knurl's pitch from its top.
+
+// The wheel, knurled from its top.
 const WHEEL_CENTER: (f32, f32) = (0.5, 0.3);
 const WHEEL_HALF: (f32, f32) = (0.024, 0.05);
 const WHEEL_RADIUS: f32 = 0.012;
+/// The height of each ridge, and of each gap between ridges.
 const KNURL: f32 = 0.013;
+
 /// The left eye: an angular blade slanting down toward the middle, like the cuts in the mouse's
 /// shell, its corners clockwise. The right eye is its mirror.
 const EYE: [(f32, f32); 4] = [(0.355, 0.445), (0.47, 0.495), (0.462, 0.528), (0.372, 0.5)];
 
+// What it writes, from the repository's root.
 const ICO: &str = "assets/icon.ico";
 const SVG: &str = "assets/icon.svg";
-const PREVIEW: &str = "docs/preview.svg";
+const PREVIEW: &str = "assets/preview.svg";
 /// The side the SVG is drawn at.
 const SVG_SIDE: f32 = 256.0;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    if !Path::new("assets").is_dir() {
-        return Err("run it from the repository's root".into());
-    }
-    fs::write(ICO, ico())?;
-    fs::write(SVG, svg())?;
-    let preview = fs::read_to_string(PREVIEW)?;
-    fs::write(PREVIEW, with_icon(&preview)?)?;
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    fs::write(root.join(ICO), ico())?;
+    fs::write(root.join(SVG), svg())?;
+    let preview = fs::read_to_string(root.join(PREVIEW))?;
+    fs::write(root.join(PREVIEW), with_icon(&preview)?)?;
     Ok(())
 }
 
@@ -264,19 +285,19 @@ fn svg() -> String {
 fn with_icon(preview: &str) -> Result<String, Box<dyn Error>> {
     const START: &str = "<!-- icon -->\n";
     const END: &str = "<!-- /icon -->";
-    let start = preview.find(START).ok_or("docs/preview.svg has no <!-- icon --> mark")? + START.len();
-    let end = preview[start..].find(END).ok_or("docs/preview.svg has no <!-- /icon --> mark")? + start;
+    let start = preview.find(START).ok_or("assets/preview.svg has no <!-- icon --> mark")? + START.len();
+    let end = preview[start..].find(END).ok_or("assets/preview.svg has no <!-- /icon --> mark")? + start;
     let indent = &preview[preview[..end].rfind('\n').map_or(0, |i| i + 1)..end];
     Ok(format!("{}{}{indent}{}", &preview[..start], drawing("app-", indent), &preview[end..]))
 }
 
-/// The drawing's elements at `SVG_SIDE`, each line indented by `indent`, its ids led by `id`.
-fn drawing(id: &str, indent: &str) -> String {
+/// The drawing's elements at `SVG_SIDE`, each line indented by `indent`, its ids led by `id_prefix`.
+fn drawing(id_prefix: &str, indent: &str) -> String {
     let at = |v: f32| number(v * SVG_SIDE);
     let hex = |c: [f32; 3]| format!("#{:02x}{:02x}{:02x}", byte(c[0]), byte(c[1]), byte(c[2]));
-    let light_stops: String = [0.0, 0.25, 0.5, 0.75, 1.0]
+    let light_stops: String = [0.0f32, 0.25, 0.5, 0.75, 1.0]
         .iter()
-        .map(|t: &f32| {
+        .map(|t| {
             let opacity = LIGHT_STRENGTH * (1.0 - t) * (1.0 - t);
             format!("\n    <stop offset=\"{t}\" stop-color=\"{}\" stop-opacity=\"{}\"/>", hex(LIGHT), number(opacity))
         })
@@ -315,33 +336,33 @@ fn drawing(id: &str, indent: &str) -> String {
         .collect();
     let lines = format!(
         r##"<defs>
-  <linearGradient id="{id}back" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="{side}">
+  <linearGradient id="{id_prefix}back" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="{side}">
     <stop offset="0" stop-color="{back_top}"/>
     <stop offset="1" stop-color="{back_bottom}"/>
   </linearGradient>
-  <radialGradient id="{id}light" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="{light_reach}" gradientTransform="translate({light_x} {light_y}) scale(1 {light_scale})">{light_stops}
+  <radialGradient id="{id_prefix}light" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="{light_reach}" gradientTransform="translate({light_x} {light_y}) scale(1 {light_scale})">{light_stops}
   </radialGradient>
-  <radialGradient id="{id}shadow">
+  <radialGradient id="{id_prefix}shadow">
     <stop offset="0" stop-color="#000" stop-opacity="{shadow}"/>
     <stop offset="1" stop-color="#000" stop-opacity="0"/>
   </radialGradient>
-  <clipPath id="{id}ghost">
+  <clipPath id="{id_prefix}ghost">
     <path d="M {arch_left} {arch} A {arch_half} {arch_half} 0 0 1 {arch_right} {arch} Q {arch_right} {side_mid} {hem_right} {hem}{hem_path} Q {arch_left} {side_mid} {arch_left} {arch} Z"/>
   </clipPath>
-  <clipPath id="{id}wheel">
+  <clipPath id="{id_prefix}wheel">
     <rect x="{wheel_x}" y="{wheel_y}" width="{wheel_w}" height="{wheel_h}" rx="{wheel_r}"/>
   </clipPath>
 </defs>
-<rect x="{square_at}" y="{square_at}" width="{square_side}" height="{square_side}" rx="{square_r}" fill="url(#{id}back)"/>
-<rect x="{square_at}" y="{square_at}" width="{square_side}" height="{square_side}" rx="{square_r}" fill="url(#{id}light)"/>
+<rect x="{square_at}" y="{square_at}" width="{square_side}" height="{square_side}" rx="{square_r}" fill="url(#{id_prefix}back)"/>
+<rect x="{square_at}" y="{square_at}" width="{square_side}" height="{square_side}" rx="{square_r}" fill="url(#{id_prefix}light)"/>
 <rect x="{edge_at}" y="{edge_at}" width="{edge_side}" height="{edge_side}" rx="{edge_r}" fill="none" stroke="{gold}" stroke-opacity="{edge_tint}" stroke-width="{edge}"/>
-<ellipse cx="{shadow_x}" cy="{shadow_y}" rx="{shadow_rx}" ry="{shadow_ry}" fill="url(#{id}shadow)"/>
-<g clip-path="url(#{id}ghost)">
+<ellipse cx="{shadow_x}" cy="{shadow_y}" rx="{shadow_rx}" ry="{shadow_ry}" fill="url(#{id_prefix}shadow)"/>
+<g clip-path="url(#{id_prefix}ghost)">
   <rect x="0" y="0" width="{half}" height="{side}" fill="{bone}"/>
   <rect x="{half}" y="0" width="{half}" height="{side}" fill="{bone_shade}"/>
   <rect x="{seam_x}" y="0" width="{seam_w}" height="{seam_end}" fill="{gold}"/>
 </g>
-<g clip-path="url(#{id}wheel)">
+<g clip-path="url(#{id_prefix}wheel)">
   <rect x="{wheel_x}" y="{wheel_y}" width="{wheel_w}" height="{wheel_h}" fill="{gold}"/>
   <g fill="{gold_dark}">{ridges}
   </g>

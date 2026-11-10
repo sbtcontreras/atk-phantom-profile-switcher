@@ -13,7 +13,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 use crate::badge;
 use crate::device::Slot;
-use crate::paint::Bitmap;
+use crate::paint::GdiObject;
 use crate::strings::Lang;
 use crate::win::wide;
 
@@ -23,7 +23,7 @@ pub struct Model {
     /// "Wireless · battery 90%", if known.
     pub status: Option<String>,
     /// Each profile with what is known of it.
-    pub slots: [(Slot, String); 4],
+    pub slots: [(Slot, String); Slot::ALL.len()],
     pub active: Option<Slot>,
     pub shows_overlay: bool,
     pub starts_with_windows: bool,
@@ -78,7 +78,7 @@ fn slot_id(slot: Slot) -> u32 {
 /// A menu and the badges it shows, destroyed together when dropped.
 struct Menu {
     handle: HMENU,
-    badges: Vec<Bitmap>,
+    badges: Vec<GdiObject>,
 }
 
 impl Menu {
@@ -103,10 +103,10 @@ impl Menu {
             }
         }
         if let Some(active) = model.active {
-            let (first, last) = (slot_id(Slot::ALL[0]), slot_id(Slot::ALL[3]));
+            let [first, .., last] = Slot::ALL;
             // SAFETY: the items exist in this menu.
             unsafe {
-                CheckMenuRadioItem(menu.handle, first, last, slot_id(active), MF_BYCOMMAND);
+                CheckMenuRadioItem(menu.handle, slot_id(first), slot_id(last), slot_id(active), MF_BYCOMMAND);
                 SetMenuDefaultItem(menu.handle, slot_id(active), 0);
             }
         }
@@ -126,7 +126,7 @@ impl Menu {
     }
 
     /// Puts `bitmap` beside item `id`; the menu keeps it until it is destroyed.
-    fn picture(&mut self, id: u32, bitmap: Bitmap) {
+    fn picture(&mut self, id: u32, bitmap: GdiObject) {
         // SAFETY: MENUITEMINFOW is plain data; only the bitmap is set.
         unsafe {
             let mut info: MENUITEMINFOW = zeroed();
@@ -162,6 +162,7 @@ mod tests {
         }
         assert_eq!(choice(OPEN_HUB), Some(Choice::OpenHub));
         assert_eq!(choice(TOGGLE_OVERLAY), Some(Choice::ToggleOverlay));
+        assert_eq!(choice(TOGGLE_STARTUP), Some(Choice::ToggleStartup));
         assert_eq!(choice(EXIT), Some(Choice::Exit));
         assert_eq!(choice(0), None);
         assert_eq!(choice(SLOT_BASE), None);

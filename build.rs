@@ -6,9 +6,8 @@ use std::path::Path;
 use std::{env, fs};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("cargo:rerun-if-changed=assets");
-    if env::var("CARGO_CFG_TARGET_OS")? != "windows" {
-        return Ok(());
+    for asset in ["assets/icon.ico", "assets/app.manifest"] {
+        println!("cargo:rerun-if-changed={asset}");
     }
     let rc = Path::new(&env::var("OUT_DIR")?).join("app.rc");
     fs::write(&rc, resources()?)?;
@@ -27,7 +26,7 @@ fn resources() -> Result<String, Box<dyn Error>> {
         env::var("CARGO_PKG_VERSION_MINOR")?,
         env::var("CARGO_PKG_VERSION_PATCH")?,
     );
-    let repository = env::var("CARGO_PKG_REPOSITORY")?;
+    // FILEOS: VOS_NT_WINDOWS32; FILETYPE: VFT_APP.
     Ok(format!(
         r#"1 ICON "{icon}"
 1 24 "{manifest}"
@@ -45,7 +44,7 @@ BEGIN
       VALUE "FileDescription", "Phantom Switch"
       VALUE "FileVersion", "{version}"
       VALUE "InternalName", "PhantomSwitch"
-      VALUE "LegalCopyright", "MIT License - {repository}"
+      VALUE "LegalCopyright", "Copyright (c) 2026 sbtcontreras. MIT License."
       VALUE "OriginalFilename", "PhantomSwitch.exe"
       VALUE "ProductName", "Phantom Switch"
       VALUE "ProductVersion", "{version}"

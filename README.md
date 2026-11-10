@@ -12,7 +12,7 @@
 
 <br>
 
-<img src="docs/preview.svg" alt="The on-screen notice after switching to profile 2, and the tray menu with the four profiles" width="100%">
+<img src="assets/preview.svg" alt="The on-screen notice after switching to profile 2, and the tray menu with the four profiles" width="100%">
 
 <sub>Illustration of the on-screen notice and the tray menu.</sub>
 
@@ -41,7 +41,7 @@ and back, with nothing to open, nothing to install, and nothing in the way of yo
 ## Download
 
 Get **`PhantomSwitch.exe`** from [Releases](https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases)
-and run it. It is a single file under 400 KB: no installer, nothing written beside it.
+and run it. It is a single file of about 400 KB: no installer, nothing written beside it.
 
 > The first time, Windows may say "Windows protected your PC" because the app is not signed.
 > Choose **More info › Run anyway**. Every release is built by GitHub from this very code, and each
@@ -84,8 +84,8 @@ Phantom Switch is built to go unnoticed.
   games: at 8000 Hz, every movement reaches Windows as if the app were not there.
 - **At rest it does nothing.** Zero CPU and about 2 MB of memory. The notice only animates while it
   is on screen.
-- **It talks to the mouse only when needed:** when you use the icon, when something is plugged in
-  or out over USB, and, through the receiver, to check the battery every 15 minutes.
+- **It talks to the mouse only when needed:** once at start, when you use the icon, when a device
+  is plugged in or out, and, through the receiver, to check the battery every 15 minutes.
 - **It never touches your settings.** It reads, and its only write is the one ATK HUB makes to
   switch profiles. Each request is sent once, never two switches at a time, and the active profile
   is never rewritten.
@@ -113,7 +113,8 @@ and tested against real answers from the mouse:
 | `23` | Read the active profile's memory: DPI table and sensor mode |
 | `177` | The mouse's features |
 
-It is written in Rust, with no dependencies beyond the Windows APIs:
+It is written in Rust; its one dependency is [`windows-sys`](https://crates.io/crates/windows-sys),
+the bindings to the Windows API:
 
 ```text
 src/
@@ -125,8 +126,9 @@ src/
 ├── overlay.rs   the on-screen notice
 ├── badge.rs     the badge that stands for each profile
 ├── paint.rs     drawing: shapes, text, icons and bitmaps
-└── …            texts in two languages, theme, settings
-assets/          the app's icon and manifest, put in the .exe by build.rs
+├── settings.rs  what you choose, in the registry (registry.rs)
+└── …            texts in two languages, Windows' theme, Windows helpers
+assets/          the icon and manifest build.rs puts in the .exe, and the README's pictures
 tools/icon/      draws the icon
 ```
 
@@ -142,8 +144,7 @@ From Linux or WSL, with [`cargo-xwin`](https://github.com/rust-cross/cargo-xwin)
 `cargo xwin build --release`. The executable lands in `target/x86_64-pc-windows-msvc/release/`.
 
 The icon is drawn in code, in [`tools/icon`](tools/icon/src/main.rs): after changing it, run
-`cargo run -p icon` from the repository's root (from Linux, add `--target x86_64-unknown-linux-gnu`)
-to write `assets/icon.ico`, `assets/icon.svg` and the illustration's icon again. CI checks they
+`cargo run -p icon` (from Linux, add `--target x86_64-unknown-linux-gnu`) to write `assets/icon.ico`, `assets/icon.svg` and the illustration's icon again. CI checks they
 are up to date.
 
 Releases publish themselves: pushing a `vX.Y.Z` tag runs the tests, builds the app and uploads it

@@ -6,14 +6,16 @@ use windows_sys::Win32::Graphics::Gdi::FW_SEMIBOLD;
 use crate::device::Slot;
 use crate::paint::{Canvas, Font, Rect, Rgb, Text};
 
-/// Each profile's color, and the color of not knowing which one is active.
-const COLORS: [Rgb; 4] = [Rgb(37, 99, 235), Rgb(220, 38, 38), Rgb(22, 163, 74), Rgb(217, 119, 6)];
+/// Each profile's color: blue, red, green and amber.
+const COLORS: [Rgb; Slot::ALL.len()] = [Rgb(37, 99, 235), Rgb(220, 38, 38), Rgb(22, 163, 74), Rgb(217, 119, 6)];
+/// The color of not knowing which profile is active.
 const UNKNOWN: Rgb = Rgb(107, 114, 128);
 
 /// How much lighter the top of the gradient is.
 const GRADIENT_LIFT: f32 = 0.18;
-/// Corner radius and text height, as a share of the side.
+/// The corner radius, as a share of the side.
 const CORNER: f32 = 0.28;
+/// The number's height, as a share of the side.
 const TEXT_HEIGHT: f32 = 0.74;
 
 /// The badge of `slot` (a question mark when it is not known), `size` × `size` pixels.
