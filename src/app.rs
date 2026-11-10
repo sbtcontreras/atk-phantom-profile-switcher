@@ -22,7 +22,7 @@ use crate::overlay::Overlay;
 use crate::strings::{self, APP_NAME, Lang};
 use crate::tray::Tray;
 use crate::win::{open_url, wide};
-use crate::worker::{self, Outcome, Report, Request, Worker};
+use crate::worker::{self, Outcome, Report, Request, Worker, back_from};
 use crate::{settings, theme};
 
 const WM_TRAY: u32 = WM_APP + 1;
@@ -159,17 +159,27 @@ fn show_menu(window: HWND) {
 struct Mouse {
     seen: Seen,
     connection: Option<Connection>,
-    slot: Option<Slot>,
     battery: Option<Battery>,
     /// What each profile had the last time it was active.
     profiles: [Option<Profile>; 4],
 }
 
-#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
+impl Mouse {
+    /// The active profile, while the mouse answers.
+    fn slot(&self) -> Option<Slot> {
+        match self.seen {
+            Seen::Ready(slot) => Some(slot),
+            Seen::Searching | Seen::NotFound | Seen::NoAnswer => None,
+        }
+    }
+}
+
+#[derive(Default, Clone, Copy)]
 enum Seen {
     #[default]
     Searching,
-    Ready,
+    /// It answered, with this profile active.
+    Ready(Slot),
     NotFound,
     NoAnswer,
 }
@@ -246,7 +256,7 @@ impl App {
     }
 
     fn activate(&mut self, slot: Slot) {
-        if self.mouse.slot != Some(slot) {
+        if self.mouse.slot() != Some(slot) {
             self.switch(Request::Activate(slot));
         }
     }
@@ -274,19 +284,17 @@ impl App {
             }
             Outcome::NoAnswer => {
                 self.mouse.seen = Seen::NoAnswer;
-                self.mouse.slot = None;
                 if switch {
                     self.tray.warn(lang.switch_failed(), lang.no_answer());
                 }
             }
             Outcome::Read { connection, snapshot, switched } => {
                 // Also when it was switched from ATK HUB: the one that was active becomes the previous.
-                if let Some(before) = self.mouse.slot.filter(|before| *before != snapshot.slot) {
+                if let Some(before) = self.mouse.slot().filter(|before| *before != snapshot.slot) {
                     self.previous = Some(before);
                 }
-                self.mouse.seen = Seen::Ready;
+                self.mouse.seen = Seen::Ready(snapshot.slot);
                 self.mouse.connection = Some(connection);
-                self.mouse.slot = Some(snapshot.slot);
                 self.mouse.battery = snapshot.battery;
                 self.mouse.profiles[snapshot.slot.index()] = Some(snapshot.profile);
                 match switched {
@@ -307,7 +315,7 @@ impl App {
         if !settings::shows_overlay() {
             return;
         }
-        let (title, details) = (self.lang.slot(slot), self.lang.profile(profile));
+        let (title, details) = (self.lang.profile_name(slot), self.lang.profile_details(profile));
         if let Some(every) = self.overlay.as_mut().map(|overlay| overlay.show(slot, &title, &details)) {
             // SAFETY: this window's timer; a new one replaces the previous.
             unsafe { SetTimer(self.window, TIMER_OVERLAY, every, None) };
@@ -316,21 +324,21 @@ impl App {
 
     fn show(&mut self) {
         let tooltip = self.tooltip();
-        self.tray.show(self.mouse.slot, &tooltip);
+        self.tray.show(self.mouse.slot(), &tooltip);
     }
 
     fn tooltip(&self) -> String {
         let (lang, mouse) = (self.lang, &self.mouse);
         let mut lines = vec![APP_NAME.to_owned()];
-        match (mouse.seen, mouse.slot) {
-            (Seen::Ready, Some(slot)) => {
-                lines[0] = format!("{APP_NAME} · {}", lang.slot(slot));
-                lines.extend(lang.connection(mouse.connection, mouse.battery));
+        match mouse.seen {
+            Seen::Ready(slot) => {
+                lines[0] = format!("{APP_NAME} · {}", lang.profile_name(slot));
+                lines.extend(lang.status(mouse.connection, mouse.battery));
                 lines.push(lang.click_hint(back_from(slot, self.previous)));
             }
-            (Seen::NotFound, _) => lines.push(lang.not_found().to_owned()),
-            (Seen::NoAnswer, _) => lines.push(lang.no_answer().to_owned()),
-            (Seen::Searching | Seen::Ready, _) => lines.push(lang.searching().to_owned()),
+            Seen::Searching => lines.push(lang.searching().to_owned()),
+            Seen::NotFound => lines.push(lang.not_found().to_owned()),
+            Seen::NoAnswer => lines.push(lang.no_answer().to_owned()),
         }
         lines.join("\n")
     }
@@ -339,10 +347,10 @@ impl App {
         let (lang, mouse) = (self.lang, &self.mouse);
         Model {
             lang,
-            status: lang.connection(mouse.connection, mouse.battery),
+            status: lang.status(mouse.connection, mouse.battery),
             slots: Slot::ALL
-                .map(|slot| (slot, mouse.profiles[slot.index()].map(|p| lang.profile(&p)).unwrap_or_default())),
-            active: mouse.slot,
+                .map(|slot| (slot, mouse.profiles[slot.index()].map(|p| lang.profile_details(&p)).unwrap_or_default())),
+            active: mouse.slot(),
             shows_overlay: settings::shows_overlay(),
             starts_with_windows: settings::starts_with_windows(),
             badge_size: self.tray.icon_size(),
@@ -357,12 +365,6 @@ impl App {
             self.tray.warn(&title, body);
         }
     }
-}
-
-/// Where the click goes from `active`: the one used before, or the 1 or the 2 while there is none.
-pub fn back_from(active: Slot, previous: Option<Slot>) -> Slot {
-    let [first, second, ..] = Slot::ALL;
-    previous.filter(|p| *p != active).unwrap_or(if active == first { second } else { first })
 }
 
 /// The warning due with this battery: (the lowest warning already shown, the one to show).
@@ -382,27 +384,8 @@ fn low_battery_notice(battery: Option<Battery>, warned: Option<u8>) -> (Option<u
 mod tests {
     use super::*;
 
-    fn slot(number: u8) -> Slot {
-        Slot::ALL[usize::from(number - 1)]
-    }
-
     fn battery(percent: u8, charging: bool) -> Option<Battery> {
         Some(Battery { percent, charging })
-    }
-
-    #[test]
-    fn the_click_goes_back_to_the_one_used_before() {
-        assert_eq!(back_from(slot(2), Some(slot(1))), slot(1));
-        assert_eq!(back_from(slot(1), Some(slot(3))), slot(3));
-        assert_eq!(back_from(slot(3), Some(slot(2))), slot(2));
-    }
-
-    #[test]
-    fn without_one_before_it_alternates_the_first_two() {
-        assert_eq!(back_from(slot(1), None), slot(2));
-        assert_eq!(back_from(slot(2), None), slot(1));
-        assert_eq!(back_from(slot(4), None), slot(1));
-        assert_eq!(back_from(slot(2), Some(slot(2))), slot(1));
     }
 
     #[test]

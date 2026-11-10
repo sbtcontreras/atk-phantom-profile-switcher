@@ -63,8 +63,55 @@ pub struct Text {
 }
 
 impl Text {
+    /// `text` drawn white on black with the font's antialiasing, kept as coverage.
     pub fn new(text: &str, font: Font) -> Option<Text> {
-        render_text(text, font)
+        let text = wide(text);
+        let units = text.len() as i32 - 1;
+        // SAFETY: every GDI object sits in a guard; guards drop in reverse order, so each object is
+        // deselected before it is deleted and the context goes last.
+        unsafe {
+            let dc = Dc::new()?;
+            let font = Object(CreateFontW(
+                -font.height,
+                0,
+                0,
+                0,
+                font.weight as i32,
+                0,
+                0,
+                0,
+                u32::from(DEFAULT_CHARSET),
+                u32::from(OUT_DEFAULT_PRECIS),
+                u32::from(CLIP_DEFAULT_PRECIS),
+                CLEARTYPE_NATURAL_QUALITY,
+                u32::from(DEFAULT_PITCH),
+                wide("Segoe UI").as_ptr(),
+            ));
+            let _font = Selected::new(&dc, font.0)?;
+            // Measured as it is drawn: natural widths run wider than GDI's own measure says.
+            let mut measured = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+            DrawTextW(dc.handle(), text.as_ptr(), units, &mut measured, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
+            // A little room on the right: antialiasing reaches past the last advance.
+            let (width, height) = (measured.right.max(1) as usize + 2, measured.bottom.max(1) as usize);
+            let (bitmap, bits) = dib(width, height)?;
+            let bitmap = Object(bitmap);
+            let _bitmap = Selected::new(&dc, bitmap.0)?;
+            SetBkMode(dc.handle(), TRANSPARENT as i32);
+            SetTextColor(dc.handle(), 0x00FF_FFFF);
+            let mut rect = RECT { left: 0, top: 0, right: width as i32, bottom: height as i32 };
+            DrawTextW(dc.handle(), text.as_ptr(), units, &mut rect, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
+            GdiFlush();
+            let pixels = std::slice::from_raw_parts(bits, width * height * 4);
+            // ClearType's natural widths space letters well; its three subpixel coverages,
+            // averaged, are the grayscale coverage a layered or alpha image needs.
+            let ink = pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|[b, g, r, _]| ((u16::from(*b) + u16::from(*g) + u16::from(*r)) / 3) as u8)
+                .collect();
+            Some(Text { width, height, ink })
+        }
     }
 
     /// The box of the pixels the text actually covers (a font's line has room above and below).
@@ -234,57 +281,6 @@ impl Drop for Bitmap {
     }
 }
 
-/// `text` drawn white on black with the font's antialiasing, kept as coverage.
-fn render_text(text: &str, font: Font) -> Option<Text> {
-    let text = wide(text);
-    let units = text.len() as i32 - 1;
-    // SAFETY: every GDI object sits in a guard; guards drop in reverse order, so each object is
-    // deselected before it is deleted and the context goes last.
-    unsafe {
-        let dc = Dc::new()?;
-        let font = Object(CreateFontW(
-            -font.height,
-            0,
-            0,
-            0,
-            font.weight as i32,
-            0,
-            0,
-            0,
-            u32::from(DEFAULT_CHARSET),
-            u32::from(OUT_DEFAULT_PRECIS),
-            u32::from(CLIP_DEFAULT_PRECIS),
-            CLEARTYPE_NATURAL_QUALITY,
-            u32::from(DEFAULT_PITCH),
-            wide("Segoe UI").as_ptr(),
-        ));
-        let _font = Selected::new(&dc, font.0)?;
-        // Measured as it is drawn: natural widths run wider than GDI's own measure says.
-        let mut measured = RECT { left: 0, top: 0, right: 0, bottom: 0 };
-        DrawTextW(dc.0, text.as_ptr(), units, &mut measured, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
-        // A little room on the right: antialiasing reaches past the last advance.
-        let (width, height) = (measured.right.max(1) as usize + 2, measured.bottom.max(1) as usize);
-        let (bitmap, bits) = dib(width, height)?;
-        let bitmap = Object(bitmap);
-        let _bitmap = Selected::new(&dc, bitmap.0)?;
-        SetBkMode(dc.0, TRANSPARENT as i32);
-        SetTextColor(dc.0, 0x00FF_FFFF);
-        let mut rect = RECT { left: 0, top: 0, right: width as i32, bottom: height as i32 };
-        DrawTextW(dc.0, text.as_ptr(), units, &mut rect, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
-        GdiFlush();
-        let pixels = std::slice::from_raw_parts(bits, width * height * 4);
-        // ClearType's natural widths space letters well; its three subpixel coverages, averaged, are
-        // the grayscale coverage a layered or alpha image needs.
-        let ink = pixels
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .map(|[b, g, r, _]| ((u16::from(*b) + u16::from(*g) + u16::from(*r)) / 3) as u8)
-            .collect();
-        Some(Text { width, height, ink })
-    }
-}
-
 /// A 32-bit top-down DIB and its pixels; the caller puts the bitmap in a guard.
 fn dib(width: usize, height: usize) -> Option<(HBITMAP, *mut u8)> {
     // SAFETY: BITMAPINFO is plain data.
@@ -316,13 +312,17 @@ impl Drop for Object {
 }
 
 /// A memory device context, deleted when dropped.
-pub(crate) struct Dc(pub(crate) HDC);
+pub struct Dc(HDC);
 
 impl Dc {
-    pub(crate) fn new() -> Option<Dc> {
+    pub fn new() -> Option<Dc> {
         // SAFETY: a memory context compatible with the screen.
         let dc = unsafe { CreateCompatibleDC(null_mut()) };
         (!dc.is_null()).then_some(Dc(dc))
+    }
+
+    pub fn handle(&self) -> HDC {
+        self.0
     }
 }
 
@@ -334,13 +334,13 @@ impl Drop for Dc {
 }
 
 /// An object selected into a context; dropping it selects back what was there.
-pub(crate) struct Selected {
+pub struct Selected {
     dc: HDC,
     previous: HGDIOBJ,
 }
 
 impl Selected {
-    pub(crate) fn new(dc: &Dc, object: HGDIOBJ) -> Option<Selected> {
+    pub fn new(dc: &Dc, object: HGDIOBJ) -> Option<Selected> {
         if object.is_null() {
             return None;
         }

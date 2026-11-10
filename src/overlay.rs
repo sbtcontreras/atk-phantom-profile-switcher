@@ -169,8 +169,17 @@ impl Overlay {
         // the call and Windows copies its pixels.
         unsafe {
             let screen = GetDC(null_mut());
-            let done =
-                UpdateLayeredWindow(self.window, screen, &position, &size, dc.0, &source, 0, &blend(alpha), ULW_ALPHA);
+            let done = UpdateLayeredWindow(
+                self.window,
+                screen,
+                &position,
+                &size,
+                dc.handle(),
+                &source,
+                0,
+                &blend(alpha),
+                ULW_ALPHA,
+            );
             ReleaseDC(null_mut(), screen);
             done != 0
         }

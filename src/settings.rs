@@ -7,12 +7,11 @@ use std::ptr::{null, null_mut};
 
 use windows_sys::Win32::Foundation::ERROR_SUCCESS;
 use windows_sys::Win32::System::Registry::{
-    HKEY, HKEY_CURRENT_USER, KEY_QUERY_VALUE, KEY_SET_VALUE, REG_DWORD, REG_OPTION_NON_VOLATILE, REG_SZ,
-    RRF_RT_REG_DWORD, RegCloseKey, RegCreateKeyExW, RegDeleteValueW, RegGetValueW, RegOpenKeyExW, RegQueryValueExW,
-    RegSetValueExW,
+    HKEY, HKEY_CURRENT_USER, KEY_QUERY_VALUE, KEY_SET_VALUE, REG_DWORD, REG_OPTION_NON_VOLATILE, REG_SZ, RegCloseKey,
+    RegCreateKeyExW, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
 };
 
-use crate::win::wide;
+use crate::win::{user_dword, wide};
 
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const RUN_VALUE: &str = "PhantomSwitch";
@@ -44,43 +43,11 @@ pub fn set_starts_with_windows(enabled: bool) {
 
 /// Whether to show the on-screen notice when switching; on until the user turns it off.
 pub fn shows_overlay() -> bool {
-    let mut value = 1u32;
-    let mut size = size_of::<u32>() as u32;
-    // SAFETY: reads a DWORD into `value`; a missing value leaves the default.
-    unsafe {
-        RegGetValueW(
-            HKEY_CURRENT_USER,
-            wide(APP_KEY).as_ptr(),
-            wide(SHOW_OVERLAY).as_ptr(),
-            RRF_RT_REG_DWORD,
-            null_mut(),
-            (&raw mut value).cast(),
-            &mut size,
-        )
-    };
-    value != 0
+    user_dword(APP_KEY, SHOW_OVERLAY).is_none_or(|shows| shows != 0)
 }
 
 pub fn set_shows_overlay(enabled: bool) {
-    let mut key: HKEY = null_mut();
-    // SAFETY: the key is created or opened into `key` and closed by `Key`.
-    let created = unsafe {
-        RegCreateKeyExW(
-            HKEY_CURRENT_USER,
-            wide(APP_KEY).as_ptr(),
-            0,
-            null(),
-            REG_OPTION_NON_VOLATILE,
-            KEY_SET_VALUE,
-            null(),
-            &mut key,
-            null_mut(),
-        )
-    };
-    if created != ERROR_SUCCESS {
-        return;
-    }
-    let key = Key(key);
+    let Some(key) = Key::create(APP_KEY) else { return };
     let value = u32::from(enabled);
     // SAFETY: a DWORD, with its size.
     unsafe {
@@ -103,6 +70,26 @@ impl Key {
         let mut key: HKEY = null_mut();
         // SAFETY: the opened key goes into `Key`, which closes it.
         let result = unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, wide(path).as_ptr(), 0, access, &mut key) };
+        (result == ERROR_SUCCESS).then_some(Key(key))
+    }
+
+    /// Opens the key to write to it, creating it if it is not there.
+    fn create(path: &str) -> Option<Key> {
+        let mut key: HKEY = null_mut();
+        // SAFETY: the created or opened key goes into `Key`, which closes it.
+        let result = unsafe {
+            RegCreateKeyExW(
+                HKEY_CURRENT_USER,
+                wide(path).as_ptr(),
+                0,
+                null(),
+                REG_OPTION_NON_VOLATILE,
+                KEY_SET_VALUE,
+                null(),
+                &mut key,
+                null_mut(),
+            )
+        };
         (result == ERROR_SUCCESS).then_some(Key(key))
     }
 }

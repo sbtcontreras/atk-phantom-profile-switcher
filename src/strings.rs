@@ -83,7 +83,7 @@ impl Lang {
         )
     }
 
-    pub fn slot(self, slot: Slot) -> String {
+    pub fn profile_name(self, slot: Slot) -> String {
         match self {
             Lang::Spanish => format!("Configuración {}", slot.number()),
             Lang::English => format!("Profile {}", slot.number()),
@@ -105,7 +105,7 @@ impl Lang {
     }
 
     /// "Wireless · battery 90%", or as much of it as is known.
-    pub fn connection(self, connection: Option<Connection>, battery: Option<Battery>) -> Option<String> {
+    pub fn status(self, connection: Option<Connection>, battery: Option<Battery>) -> Option<String> {
         let link = connection.map(|c| match c {
             Connection::Wireless => self.pick("Inalámbrico", "Wireless").to_owned(),
             Connection::Wired => self.pick("Cable", "Wired").to_owned(),
@@ -119,7 +119,7 @@ impl Lang {
     }
 
     /// "4000 Hz · 1600 DPI · competitive sensor", or as much of it as is known.
-    pub fn profile(self, profile: &Profile) -> String {
+    pub fn profile_details(self, profile: &Profile) -> String {
         let polling = profile.polling_hz.map(|hz| format!("{hz}{NBSP}Hz"));
         let dpi = profile.dpi.map(|(x, y)| if x == y { format!("{x}{NBSP}DPI") } else { format!("{x}×{y}{NBSP}DPI") });
         let sensor = profile.sensor.map(|sensor| {
@@ -160,32 +160,32 @@ impl Lang {
 mod tests {
     use super::*;
 
-    const WIRELESS_90: Option<Battery> = Some(Battery { percent: 90, charging: false });
+    const AT_90: Option<Battery> = Some(Battery { percent: 90, charging: false });
     const CHARGING_40: Option<Battery> = Some(Battery { percent: 40, charging: true });
 
     #[test]
     fn says_what_it_knows_of_the_connection() {
-        let spanish = Lang::Spanish.connection(Some(Connection::Wireless), WIRELESS_90);
+        let spanish = Lang::Spanish.status(Some(Connection::Wireless), AT_90);
         assert_eq!(spanish.as_deref(), Some("Inalámbrico · batería 90\u{a0}%"));
-        let english = Lang::English.connection(Some(Connection::Wired), CHARGING_40);
+        let english = Lang::English.status(Some(Connection::Wired), CHARGING_40);
         assert_eq!(english.as_deref(), Some("Wired · battery 40% · charging"));
-        assert_eq!(Lang::English.connection(None, None), None);
+        assert_eq!(Lang::English.status(None, None), None);
     }
 
     #[test]
     fn says_what_it_knows_of_a_profile() {
         let full = Profile { polling_hz: Some(4000), dpi: Some((1600, 1600)), sensor: Some(Sensor::Competitive) };
-        assert_eq!(Lang::Spanish.profile(&full), "4000\u{a0}Hz · 1600\u{a0}DPI · sensor competitivo");
-        assert_eq!(Lang::English.profile(&full), "4000\u{a0}Hz · 1600\u{a0}DPI · competitive sensor");
+        assert_eq!(Lang::Spanish.profile_details(&full), "4000\u{a0}Hz · 1600\u{a0}DPI · sensor competitivo");
+        assert_eq!(Lang::English.profile_details(&full), "4000\u{a0}Hz · 1600\u{a0}DPI · competitive sensor");
         let split = Profile { polling_hz: None, dpi: Some((800, 1600)), sensor: None };
-        assert_eq!(Lang::English.profile(&split), "800×1600\u{a0}DPI");
+        assert_eq!(Lang::English.profile_details(&split), "800×1600\u{a0}DPI");
     }
 
     #[test]
     fn names_profiles_in_each_language() {
         let second = Slot::ALL[1];
-        assert_eq!(Lang::Spanish.slot(second), "Configuración 2");
-        assert_eq!(Lang::English.slot(second), "Profile 2");
+        assert_eq!(Lang::Spanish.profile_name(second), "Configuración 2");
+        assert_eq!(Lang::English.profile_name(second), "Profile 2");
         assert_eq!(Lang::English.low_battery(5, 4).0, "Battery almost empty: 4%");
     }
 }

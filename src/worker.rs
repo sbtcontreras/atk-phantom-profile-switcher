@@ -107,7 +107,7 @@ fn serve(mouse: &mut Option<Phantom>, request: Request) -> Option<Outcome> {
         *mouse = Phantom::find();
     }
     let Some(phantom) = mouse.as_mut() else { return Some(Outcome::NotFound) };
-    match read(phantom, request) {
+    match carry_out(phantom, request) {
         Ok(outcome) => Some(outcome),
         Err(Disconnected) => {
             *mouse = None;
@@ -116,12 +116,13 @@ fn serve(mouse: &mut Option<Phantom>, request: Request) -> Option<Outcome> {
     }
 }
 
-fn read(phantom: &mut Phantom, request: Request) -> crate::device::Result<Outcome> {
+/// Switches if the request asks for it, then reads what the mouse has.
+fn carry_out(phantom: &mut Phantom, request: Request) -> crate::device::Result<Outcome> {
     let target = match request {
         Request::Refresh | Request::Menu | Request::Battery => None,
         // Already active: the mouse is not written what it already has.
         Request::Activate(slot) => (phantom.active_slot()? != Some(slot)).then_some(slot),
-        Request::Back { previous } => phantom.active_slot()?.map(|active| crate::app::back_from(active, previous)),
+        Request::Back { previous } => phantom.active_slot()?.map(|active| back_from(active, previous)),
     };
     let switched = match target {
         Some(slot) => Some(phantom.activate(slot)?),
@@ -131,4 +132,34 @@ fn read(phantom: &mut Phantom, request: Request) -> crate::device::Result<Outcom
         Some(snapshot) => Outcome::Read { connection: phantom.connection(), snapshot, switched },
         None => Outcome::NoAnswer,
     })
+}
+
+/// Where the click goes from `active`: the one used before, or the 1 or the 2 while there is none.
+pub fn back_from(active: Slot, previous: Option<Slot>) -> Slot {
+    let [first, second, ..] = Slot::ALL;
+    previous.filter(|p| *p != active).unwrap_or(if active == first { second } else { first })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn slot(number: u8) -> Slot {
+        Slot::ALL[usize::from(number - 1)]
+    }
+
+    #[test]
+    fn the_click_goes_back_to_the_one_used_before() {
+        assert_eq!(back_from(slot(2), Some(slot(1))), slot(1));
+        assert_eq!(back_from(slot(1), Some(slot(3))), slot(3));
+        assert_eq!(back_from(slot(3), Some(slot(2))), slot(2));
+    }
+
+    #[test]
+    fn without_one_before_it_alternates_the_first_two() {
+        assert_eq!(back_from(slot(1), None), slot(2));
+        assert_eq!(back_from(slot(2), None), slot(1));
+        assert_eq!(back_from(slot(4), None), slot(1));
+        assert_eq!(back_from(slot(2), Some(slot(2))), slot(1));
+    }
 }

@@ -95,7 +95,7 @@ impl Menu {
         }
         for (slot, details) in &model.slots {
             // What is known of each profile goes to the right, after the tab.
-            let name = lang.slot(*slot);
+            let name = lang.profile_name(*slot);
             let label = if details.is_empty() { name } else { format!("{name}\t{details}") };
             menu.item(&label, slot_id(*slot), 0);
             if let Some(bitmap) = badge::draw(Some(*slot), model.badge_size).bitmap() {

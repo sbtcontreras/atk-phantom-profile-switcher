@@ -1,5 +1,5 @@
-# Se compila para Windows desde WSL con cargo-xwin, con la biblioteca de C incluida
-# en el .exe: no necesita ningún redistribuible instalado.
+# Built for Windows (from WSL with cargo-xwin, or on Windows itself), with the C runtime inside
+# the .exe: nothing needs to be installed to run it.
 [build]
 target = "x86_64-pc-windows-msvc"
 

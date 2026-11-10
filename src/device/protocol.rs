@@ -207,7 +207,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_active_config_and_its_polling_rate() {
+    fn reads_the_active_profile_and_its_polling_rate() {
         let first = report("72 00 14 00 09 12 00 00 00 01 00 05 00 00 00 3c 00 01");
         let second = report("72 00 14 00 09 12 01 00 05 01 00 05 00 00 00 3c 00 01");
         let data = |r| Request::Active.answer(r).and_then(active);
