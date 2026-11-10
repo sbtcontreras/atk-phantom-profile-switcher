@@ -1,0 +1,47 @@
+# Al subir una etiqueta vX.Y.Z (anotada: su mensaje son las notas de la versión), compila el .exe
+# en Windows desde este código, corre las pruebas y lo publica en Releases con su SHA-256.
+# Las versiones 0.x salen como pre-release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust estable
+        run: rustup update stable && rustup default stable
+
+      - name: La etiqueta coincide con Cargo.toml
+        shell: bash
+        run: |
+          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "La etiqueta $GITHUB_REF_NAME no coincide con la versión $version de Cargo.toml."
+            exit 1
+          fi
+
+      - name: Pruebas
+        run: cargo test
+
+      - name: Compilar
+        run: cargo build --release
+
+      - name: Publicar
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp target/x86_64-pc-windows-msvc/release/AtkPhantomModo.exe .
+          sha256sum AtkPhantomModo.exe > AtkPhantomModo.exe.sha256
+          prerelease=""
+          case "$GITHUB_REF_NAME" in v0.*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" AtkPhantomModo.exe AtkPhantomModo.exe.sha256 \
+            --title "$GITHUB_REF_NAME" --notes-from-tag $prerelease

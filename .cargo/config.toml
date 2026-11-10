@@ -1,0 +1,7 @@
+# Se compila para Windows desde WSL con cargo-xwin, con la biblioteca de C incluida
+# en el .exe: no necesita ningún redistribuible instalado.
+[build]
+target = "x86_64-pc-windows-msvc"
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=/ignore:4099"]

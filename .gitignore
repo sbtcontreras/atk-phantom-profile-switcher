@@ -1,0 +1,3 @@
+/target
+# El .exe se publica en las releases, no en el repositorio.
+*.exe
