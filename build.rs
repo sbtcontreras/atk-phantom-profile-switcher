@@ -1,6 +1,6 @@
 //! The `.exe`'s resources: its icon, its version information and its manifest (per-monitor
-//! scaling, modern controls). The icon is drawn right here, so the repository carries no images:
-//! a rounded square in an indigo gradient with a white toggle switch.
+//! scaling, modern controls). The icon is drawn right here from shapes rather than kept as a
+//! bitmap; `docs/icon.svg` is the same drawing, for the README.
 
 use std::error::Error;
 use std::path::Path;
@@ -141,17 +141,30 @@ fn bitmap(size: usize, rgba: &[[f32; 4]]) -> Vec<u8> {
     image
 }
 
-/// Phantom Switch's icon: a ghost shaped like a mouse (the seam between its buttons and its wheel
-/// on top, a ghost's wavy hem below) on a rounded square in an indigo gradient. RGBA from 0 to 1,
-/// top to bottom, with 4 × 4 samples per pixel.
+/// The look of the ATK Phantom itself: a bone-white shell with gold details, in warm dark light.
+const BONE: [f32; 3] = [0.95, 0.92, 0.86];
+/// The right half of the shell, a shade darker, as a second panel catching less light.
+const BONE_SHADE: [f32; 3] = [0.86, 0.82, 0.74];
+const GOLD: [f32; 3] = [0.8, 0.64, 0.36];
+const GOLD_DARK: [f32; 3] = [0.55, 0.42, 0.22];
+const EYES: [f32; 3] = [0.09, 0.075, 0.06];
+const BACK_TOP: [f32; 3] = [0.2, 0.18, 0.15];
+const BACK_BOTTOM: [f32; 3] = [0.075, 0.065, 0.055];
+const LIGHT: [f32; 3] = [0.45, 0.39, 0.29];
+
+/// Phantom Switch's icon: a fierce ghost shaped like a mouse, in the ATK Phantom's own look (a
+/// bone-white shell in two panels with the mouse's rounded front, a gold seam and wheel, angular
+/// eyes, a hem of spikes) on a rounded square of warm dark with a light from above and a thin
+/// gold edge. RGBA from 0 to 1, top to bottom, with 4 × 4 samples per pixel.
 fn brand(size: usize) -> Vec<[f32; 4]> {
     let n = size as f32;
-    let top_left = [0.39, 0.40, 0.95];
-    let bottom_right = [0.42, 0.16, 0.85];
-    // Below 32 px the seam and the wheel would be a smudge: the ghost keeps its eyes.
+    // Below 32 px the edge, the seam and the wheel would be a smudge, and the wheel's knurl
+    // below 64: the ghost keeps its eyes.
     let details = size >= 32;
-    // The seam is at least a pixel wide.
-    let seam = (0.6 / n).max(0.009);
+    let knurl = size >= 64;
+    // Lines are at least a pixel wide.
+    let line = (0.6 / n).max(0.009);
+    let edge = (0.9 / n).max(0.012);
     let mut pixels = vec![[0.0; 4]; size * size];
     for y in 0..size {
         for x in 0..size {
@@ -160,28 +173,33 @@ fn brand(size: usize) -> Vec<[f32; 4]> {
                 for sx in 0..4 {
                     let px = (x as f32 + (sx as f32 + 0.5) / 4.0) / n;
                     let py = (y as f32 + (sy as f32 + 0.5) / 4.0) / n;
-                    if rounded_box(px - 0.5, py - 0.5, 0.47, 0.47, 0.22) > 0.0 {
+                    let square = rounded_box(px - 0.5, py - 0.5, 0.47, 0.47, 0.22);
+                    if square > 0.0 {
                         continue;
                     }
-                    let t = (px + py) / 2.0;
-                    let mut color: [f32; 3] =
-                        std::array::from_fn(|i| top_left[i] + (bottom_right[i] - top_left[i]) * t);
+                    let mut color = mix(BACK_TOP, BACK_BOTTOM, py);
+                    // The light from above, as in the room the mouse sits in.
+                    let glow = (1.0 - (px - 0.5).hypot((py + 0.05) * 1.2) / 0.8).max(0.0);
+                    color = mix(color, LIGHT, 0.45 * glow * glow);
+                    if details && square > -edge {
+                        color = mix(color, GOLD, 0.6);
+                    }
                     // A soft shadow under the ghost, as if it floated.
-                    let below = ((px - 0.5) / 0.2).hypot((py - 0.845) / 0.03);
+                    let below = ((px - 0.5) / 0.22).hypot((py - 0.875) / 0.03);
                     if details && below < 1.0 {
-                        color = color.map(|c| c * (1.0 - 0.3 * (1.0 - below)));
+                        color = color.map(|c| c * (1.0 - 0.45 * (1.0 - below)));
                     }
                     if ghost(px, py) {
-                        color = [1.0, 1.0, 1.0];
-                        let eye = |cx: f32| ((px - cx) / 0.04).hypot((py - 0.47) / 0.055) <= 1.0;
-                        if eye(0.415) || eye(0.585) {
-                            color = [0.12, 0.11, 0.29];
+                        color = if px < 0.5 { BONE } else { BONE_SHADE };
+                        if blade(px, py) || blade(1.0 - px, py) {
+                            color = EYES;
                         }
-                        if details && (px - 0.5).abs() <= seam && py <= 0.37 {
-                            color = [0.62, 0.65, 0.97];
+                        if details && (px - 0.5).abs() <= line && py <= 0.4 {
+                            color = GOLD;
                         }
-                        if details && rounded_box(px - 0.5, py - 0.29, 0.024, 0.048, 0.024) <= 0.0 {
-                            color = [0.45, 0.47, 0.92];
+                        if details && rounded_box(px - 0.5, py - 0.3, 0.024, 0.05, 0.012) <= 0.0 {
+                            let ridge = ((py - 0.25) / 0.013).floor() as i32 % 2 == 0;
+                            color = if knurl && ridge { GOLD_DARK } else { GOLD };
                         }
                     }
                     for i in 0..3 {
@@ -201,26 +219,51 @@ fn brand(size: usize) -> Vec<[f32; 4]> {
     pixels
 }
 
-/// Whether (`x`, `y`), from 0 to 1, falls inside the ghost: a dome on top (the mouse's front),
-/// straight sides, and three scallops hanging from its hem.
+fn mix(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
+    std::array::from_fn(|i| a[i] + (b[i] - a[i]) * t)
+}
+
+/// Whether (`x`, `y`), from 0 to 1, falls inside the ghost: the mouse's rounded front on top,
+/// sides that widen like a cape, and three spikes at its hem, the middle one longest.
 fn ghost(x: f32, y: f32) -> bool {
-    const LEFT: f32 = 0.27;
-    const RIGHT: f32 = 0.73;
-    const DOME: f32 = 0.42;
-    const HEM: f32 = 0.7;
-    let half = (RIGHT - LEFT) / 2.0;
-    if y < DOME {
-        return (x - 0.5).hypot(y - DOME) <= half;
-    }
-    if !(LEFT..=RIGHT).contains(&x) {
-        return false;
+    /// Where the front meets the sides, and its half width there.
+    const ARCH: f32 = 0.45;
+    const ARCH_HALF: f32 = 0.22;
+    /// The radius of the front's two arcs: equal to the half width, a round front.
+    const RADIUS: f32 = 0.22;
+    const HEM: f32 = 0.69;
+    const HEM_HALF: f32 = 0.27;
+    const SPIKE: f32 = 0.16;
+    let off = (x - 0.5).abs();
+    if y < ARCH {
+        // Inside both arcs, each centered on the other side.
+        let center = ARCH_HALF - RADIUS;
+        return (off + center).hypot(y - ARCH) <= RADIUS && (off - center).hypot(y - ARCH) <= RADIUS;
     }
     if y <= HEM {
-        return true;
+        let t = (y - ARCH) / (HEM - ARCH);
+        return off <= ARCH_HALF + (HEM_HALF - ARCH_HALF) * t * t;
     }
-    let bump = (RIGHT - LEFT) / 6.0;
-    let scallop = ((x - LEFT) / (2.0 * bump)).floor().clamp(0.0, 2.0);
-    (x - (LEFT + bump * (2.0 * scallop + 1.0))).hypot(y - HEM) <= bump
+    if off > HEM_HALF {
+        return false;
+    }
+    let tooth = 2.0 * HEM_HALF / 3.0;
+    let index = ((x - (0.5 - HEM_HALF)) / tooth).floor().clamp(0.0, 2.0);
+    let center = 0.5 - HEM_HALF + tooth * (index + 0.5);
+    let depth = if index == 1.0 { SPIKE } else { SPIKE * 0.8 };
+    y - HEM <= depth * (1.0 - (x - center).abs() / (tooth / 2.0))
+}
+
+/// Whether (`x`, `y`) falls inside the left eye: an angular blade slanting down toward the middle,
+/// like the cuts in the mouse's shell. The right eye is its mirror.
+fn blade(x: f32, y: f32) -> bool {
+    const CORNERS: [(f32, f32); 4] = [(0.355, 0.445), (0.47, 0.495), (0.462, 0.528), (0.372, 0.5)];
+    // Inside a convex shape: on the same side of every edge, taken clockwise.
+    (0..4).all(|i| {
+        let (ax, ay) = CORNERS[i];
+        let (bx, by) = CORNERS[(i + 1) % 4];
+        (bx - ax) * (y - ay) - (by - ay) * (x - ax) >= 0.0
+    })
 }
 
 /// Signed distance to a rounded box centered at the origin (negative inside).

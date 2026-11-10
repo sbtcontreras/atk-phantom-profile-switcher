@@ -6,7 +6,7 @@
 
 **Your ATK Phantom's profiles, one click from the clock.**
 
-[![Release](https://img.shields.io/github/v/release/sbtcontreras/atk-phantom-profile-switcher?include_prereleases&label=release&color=6366f1)](https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases)
+[![Release](https://img.shields.io/github/v/release/sbtcontreras/atk-phantom-profile-switcher?include_prereleases&label=release&color=cca35c)](https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases)
 [![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%C2%B7%2011-0078d4)](#compatibility)
 [![MIT license](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
 

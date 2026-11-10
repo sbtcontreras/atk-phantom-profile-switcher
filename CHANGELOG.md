@@ -8,7 +8,7 @@ All notable changes to Phantom Switch. The format follows
 
 ### Changed
 
-- A new icon for the app: a ghost shaped like a mouse, the seam between its buttons and its wheel on top and a ghost's wavy hem below, on an indigo gradient. The tray icon still shows the active profile's number.
+- A new icon for the app, in the ATK Phantom's own look: a fierce ghost shaped like the mouse, its bone-white shell in two panels with a gold seam and wheel, angular eyes and a hem of spikes, on a warm dark tile with a thin gold edge. The tray icon still shows the active profile's number.
 
 ### Note
 
