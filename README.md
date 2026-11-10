@@ -12,7 +12,7 @@ competitiva, y un menú con la batería y el polling rate, el DPI y el modo del 
 
 ## Descarga
 
-En [Releases](../../releases/latest), `AtkPhantomModo.exe`: un solo archivo de unos 270 KB, sin
+En [Releases](../../releases), `AtkPhantomModo.exe`: un solo archivo de unos 270 KB, sin
 instalación ni archivos al lado. Funciona en Windows 10 y 11.
 
 Windows puede avisar «Windows protegió su PC» la primera vez, porque el programa no está firmado:
