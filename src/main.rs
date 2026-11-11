@@ -8,7 +8,7 @@
 //!
 //! It never listens to the mouse or the keyboard: it talks to the mouse once at start, when asked,
 //! when Windows says a device was plugged in or out, and, through the receiver, for the battery
-//! every 15 minutes.
+//! every 15 minutes. Once a day at most, `update` asks GitHub for the latest version's number.
 
 #![windows_subsystem = "windows"]
 
@@ -29,6 +29,7 @@ mod settings;
 mod strings;
 mod theme;
 mod tray;
+mod update;
 mod win;
 mod worker;
 

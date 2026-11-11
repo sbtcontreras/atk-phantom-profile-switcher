@@ -1,5 +1,5 @@
 //! The tray menu: what is known of the mouse, its 4 profiles (each with its badge, the active
-//! one bold and checked) and the actions.
+//! one bold and checked) and the actions, led by a new version when there is one.
 
 use std::mem::{size_of, zeroed};
 use std::ptr::null;
@@ -15,6 +15,7 @@ use crate::badge;
 use crate::device::Slot;
 use crate::paint::GdiObject;
 use crate::strings::Lang;
+use crate::update::Version;
 use crate::win::wide;
 
 /// What the menu shows.
@@ -27,6 +28,8 @@ pub struct Model {
     pub active: Option<Slot>,
     pub shows_overlay: bool,
     pub starts_with_windows: bool,
+    /// A newer release than this one, to download.
+    pub update: Option<Version>,
     /// The side of a badge, at the screen's scaling.
     pub badge_size: usize,
 }
@@ -35,6 +38,7 @@ pub struct Model {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Choice {
     Activate(Slot),
+    Download,
     OpenHub,
     ToggleOverlay,
     ToggleStartup,
@@ -46,6 +50,7 @@ const OPEN_HUB: u32 = 200;
 const TOGGLE_OVERLAY: u32 = 201;
 const TOGGLE_STARTUP: u32 = 202;
 const EXIT: u32 = 203;
+const DOWNLOAD: u32 = 204;
 
 /// Shows the menu at `at` and waits for a choice; `None` if it closed without one.
 pub fn show(window: HWND, model: &Model, at: POINT) -> Option<Choice> {
@@ -63,6 +68,7 @@ pub fn show(window: HWND, model: &Model, at: POINT) -> Option<Choice> {
 
 fn choice(id: u32) -> Option<Choice> {
     match id {
+        DOWNLOAD => Some(Choice::Download),
         OPEN_HUB => Some(Choice::OpenHub),
         TOGGLE_OVERLAY => Some(Choice::ToggleOverlay),
         TOGGLE_STARTUP => Some(Choice::ToggleStartup),
@@ -111,6 +117,9 @@ impl Menu {
             }
         }
         menu.separator();
+        if let Some(version) = model.update {
+            menu.item(&lang.download(version), DOWNLOAD, 0);
+        }
         menu.item(lang.open_hub(), OPEN_HUB, 0);
         menu.item(lang.show_overlay(), TOGGLE_OVERLAY, if model.shows_overlay { MF_CHECKED } else { 0 });
         menu.item(lang.start_with_windows(), TOGGLE_STARTUP, if model.starts_with_windows { MF_CHECKED } else { 0 });
@@ -160,6 +169,7 @@ mod tests {
         for slot in Slot::ALL {
             assert_eq!(choice(slot_id(slot)), Some(Choice::Activate(slot)));
         }
+        assert_eq!(choice(DOWNLOAD), Some(Choice::Download));
         assert_eq!(choice(OPEN_HUB), Some(Choice::OpenHub));
         assert_eq!(choice(TOGGLE_OVERLAY), Some(Choice::ToggleOverlay));
         assert_eq!(choice(TOGGLE_STARTUP), Some(Choice::ToggleStartup));

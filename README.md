@@ -37,10 +37,11 @@ and back, with nothing to open, nothing to install, and nothing in the way of yo
 - **At home in Windows.** Sharp at any display scaling, dark when Windows is dark, usable from the
   keyboard, in English or Spanish (it follows Windows' language).
 - **Starts with Windows** if you want it to, with ATK HUB a click away.
+- **Tells you when there is a new version**, in its menu, with the download a click away.
 
 ## Download
 
-Get **`PhantomSwitch.exe`** from [Releases](https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases)
+Get **`PhantomSwitch.exe`** from the [latest release](https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases/latest)
 and run it. It is a single file of about 400 KB: no installer, nothing written beside it.
 
 > The first time, Windows may say "Windows protected your PC" because the app is not signed.
@@ -54,7 +55,7 @@ Set up your profiles in [ATK HUB](https://hub.atk.pro/) as usual; Phantom Switch
 | | |
 |---|---|
 | **Click** the icon | Back to the profile you used before; the first time, it alternates between 1 and 2. |
-| **Right-click** | The menu: connection and battery, the four profiles with what each one has, **Open ATK HUB**, **Show a notice when switching**, **Start with Windows** and **Exit**. |
+| **Right-click** | The menu: connection and battery, the four profiles with what each one has, **Open ATK HUB**, **Show a notice when switching**, **Start with Windows** and **Exit**. When a new version is out, **Download version X.Y.Z** comes first among them. |
 | **Keyboard** | <kbd>Win</kbd> + <kbd>B</kbd> reaches the tray; <kbd>Enter</kbd> switches and the menu key opens the menu. |
 
 The menu reads the mouse as it opens:
@@ -76,6 +77,9 @@ Wireless · battery 90%
 The active profile is read on the spot; the others show what they had the last time they were
 active.
 
+To update, download the new `PhantomSwitch.exe` and put it in place of the old one; your choices
+are kept.
+
 ## Light by design
 
 Phantom Switch is built to go unnoticed.
@@ -86,6 +90,9 @@ Phantom Switch is built to go unnoticed.
   is on screen.
 - **It talks to the mouse only when needed:** once at start, when you use the icon, when a device
   is plugged in or out, and, through the receiver, to check the battery every 15 minutes.
+- **It asks GitHub for the latest version once a day at most**: a single request for the number
+  of the latest release, on a thread that ends with it (without a connection, it tries again an
+  hour later). Nothing else is sent, and nothing is downloaded or installed on its own.
 - **It never touches your settings.** It reads, and its only write is the one ATK HUB makes to
   switch profiles. Each request is sent once, never two switches at a time, and the active profile
   is never rewritten.
@@ -127,6 +134,7 @@ src/
 ├── badge.rs     the badge that stands for each profile
 ├── paint.rs     drawing: shapes, text, icons and bitmaps
 ├── settings.rs  what you choose, in the registry (registry.rs)
+├── update.rs    whether a new version is out
 └── …            texts in two languages, Windows' theme, Windows helpers
 assets/          the icon and manifest build.rs puts in the .exe, and the README's pictures
 tools/icon/      draws the icon
@@ -148,7 +156,8 @@ The icon is drawn in code, in [`tools/icon`](tools/icon/src/main.rs): after chan
 are up to date.
 
 Releases publish themselves: pushing a `vX.Y.Z` tag runs the tests, builds the app and uploads it
-to Releases with that version's section of the [changelog](CHANGELOG.md) as its notes.
+to Releases with that version's section of the [changelog](CHANGELOG.md) as its notes. The app
+offers only stable releases: `0.x` tags are published as pre-releases, which it never offers.
 
 ## License
 

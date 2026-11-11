@@ -5,6 +5,7 @@ use std::sync::OnceLock;
 use windows_sys::Win32::Globalization::GetUserDefaultUILanguage;
 
 use crate::device::{Battery, Connection, Profile, Sensor, Slot};
+use crate::update::Version;
 
 /// A non-breaking space, between a number and its unit.
 const NBSP: char = '\u{a0}';
@@ -64,6 +65,13 @@ impl Lang {
 
     pub fn start_with_windows(self) -> &'static str {
         self.pick("Iniciar con Windows", "Start with Windows")
+    }
+
+    pub fn download(self, version: Version) -> String {
+        match self {
+            Lang::Spanish => format!("Descargar la versión {version}"),
+            Lang::English => format!("Download version {version}"),
+        }
     }
 
     pub fn exit(self) -> &'static str {

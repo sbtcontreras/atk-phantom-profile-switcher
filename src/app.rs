@@ -1,6 +1,7 @@
 //! The interface: a hidden window that receives the tray icon's clicks, Windows' notices and the
 //! mouse thread's results, and what is known of the mouse to show it. It all lives on the
-//! interface's thread; with the mouse thread it only trades requests and results.
+//! interface's thread; with the mouse thread it only trades requests and results, and the check
+//! for a new version answers it the same way.
 
 use std::cell::{Cell, RefCell};
 use std::mem::zeroed;
@@ -21,12 +22,14 @@ use crate::menu::{self, Choice, Model};
 use crate::overlay::Overlay;
 use crate::strings::{self, Lang};
 use crate::tray::Tray;
+use crate::update::{self, Answer, Version};
 use crate::win::{open_url, wide};
 use crate::worker::{self, Job, Outcome, Reply, Worker, back_from};
 use crate::{APP_ID, APP_NAME, settings, theme};
 
 const WM_TRAY: u32 = WM_APP + 1;
 const WM_REPLY: u32 = WM_APP + 2;
+const WM_UPDATE: u32 = WM_APP + 3;
 /// Enter or Space on the icon.
 const NIN_KEYSELECT: u32 = NIN_SELECT | NINF_KEY;
 
@@ -98,6 +101,9 @@ unsafe extern "system" fn window_proc(window: HWND, message: u32, wparam: WPARAM
                 show_menu(window);
             }
         }
+        WM_UPDATE => {
+            with_app(|app| app.on_update(update::take_answer(wparam, lparam)));
+        }
         WM_TIMER => {
             with_app(|app| app.on_timer(wparam));
         }
@@ -142,6 +148,7 @@ fn show_menu(window: HWND) {
         Some(Choice::Activate(slot)) => {
             with_app(|app| app.switch(Job::Activate(slot)));
         }
+        Some(Choice::Download) => open_url(update::RELEASE_PAGE),
         Some(Choice::OpenHub) => open_url(HUB_URL),
         Some(Choice::ToggleOverlay) => settings::set_shows_overlay(!model.shows_overlay),
         Some(Choice::ToggleStartup) => settings::set_starts_with_windows(!model.starts_with_windows),
@@ -199,6 +206,12 @@ struct App {
     /// Where to open the menu being read.
     menu_at: POINT,
     menu_open: bool,
+    /// The latest release known, from the last check that got an answer.
+    latest: Option<Version>,
+    /// A check for a new version asked for and not answered yet.
+    checking: bool,
+    /// When the last check could not ask, in seconds since 1970: the next one waits a while.
+    check_failed: Option<u64>,
 }
 
 impl App {
@@ -215,6 +228,9 @@ impl App {
             warned: None,
             menu_at: POINT { x: 0, y: 0 },
             menu_open: false,
+            latest: settings::latest_version(),
+            checking: false,
+            check_failed: None,
         }
     }
 
@@ -223,6 +239,7 @@ impl App {
         self.worker.send(Job::Refresh);
         // SAFETY: this window's timer.
         unsafe { SetTimer(self.window, TIMER_BATTERY, BATTERY_EVERY_MS, None) };
+        self.check_for_update();
     }
 
     fn on_tray(&mut self, event: u32, anchor: POINT) {
@@ -242,10 +259,34 @@ impl App {
                 self.kill_timer(TIMER_DEVICES);
                 self.worker.send(Job::Refresh);
             }
-            TIMER_BATTERY => self.worker.send(Job::Battery),
+            TIMER_BATTERY => {
+                self.worker.send(Job::Battery);
+                // No timer of its own: it rides on the battery's, and asks only when a day has passed.
+                self.check_for_update();
+            }
             // The notice is over: no more frames.
             TIMER_OVERLAY if !self.overlay.as_mut().is_some_and(Overlay::tick) => self.kill_timer(TIMER_OVERLAY),
             _ => {}
+        }
+    }
+
+    fn check_for_update(&mut self) {
+        if !self.checking && update::due(settings::update_checked(), self.check_failed, update::now()) {
+            self.checking = true;
+            update::check_in_background(self.window, WM_UPDATE);
+        }
+    }
+
+    /// Keeps what the check found, or when it could not ask, to try again later.
+    fn on_update(&mut self, answer: Answer) {
+        self.checking = false;
+        match answer {
+            Ok(latest) => {
+                settings::set_update_checked(update::now(), latest);
+                self.latest = latest;
+                self.check_failed = None;
+            }
+            Err(_) => self.check_failed = Some(update::now()),
         }
     }
 
@@ -346,6 +387,7 @@ impl App {
             active: mouse.slot(),
             shows_overlay: settings::shows_overlay(),
             starts_with_windows: settings::starts_with_windows(),
+            update: self.latest.filter(|latest| latest.is_newer()),
             badge_size: self.tray.icon_size(),
         }
     }

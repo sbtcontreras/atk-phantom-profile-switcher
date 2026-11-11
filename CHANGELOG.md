@@ -4,6 +4,15 @@ All notable changes to Phantom Switch. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/). Each release's notes on GitHub are its section here.
 
+## [1.0.0] - 2026-11-10
+
+The first stable release: switching from the app is now verified on a real ATK Phantom Ultimate
+(BITMOUSE firmware), wired and through its 8K receiver, like every read before it.
+
+### Added
+
+- Phantom Switch tells you when a new version is out: **Download version X.Y.Z** leads the menu and opens its release. Once a day at most, it asks GitHub for the latest release's number, with a single request on a thread that ends with it; nothing else is sent, and nothing is downloaded or installed on its own. Only stable releases are offered.
+
 ## [0.3.1] - 2026-11-10
 
 ### Changed
@@ -65,6 +74,7 @@ This is a pre-release: every read is verified on a real ATK Phantom Ultimate (BI
 
 This is a pre-release: every read is verified on a real ATK Phantom Ultimate (BITMOUSE firmware), wired and through its 8K receiver, but switching from the app is not yet.
 
+[1.0.0]: https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases/tag/v1.0.0
 [0.3.1]: https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases/tag/v0.3.1
 [0.3.0]: https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases/tag/v0.3.0
 [0.2.0]: https://github.com/sbtcontreras/atk-phantom-profile-switcher/releases/tag/v0.2.0
