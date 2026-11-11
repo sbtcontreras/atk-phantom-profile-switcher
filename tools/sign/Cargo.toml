@@ -1,0 +1,16 @@
+[package]
+name = "sign"
+version = "0.0.0"
+description = "Signs Phantom Switch's releases, so the app installs only what was signed with its key."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+base64 = "0.22"
+p256 = "0.14"
+getrandom = "0.4"
+
+[lints]
+workspace = true

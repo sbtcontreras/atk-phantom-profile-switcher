@@ -18,6 +18,16 @@ use crate::strings::Lang;
 use crate::update::Version;
 use crate::win::wide;
 
+/// A newer release, as the menu offers it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Offer {
+    /// This build cannot install it: its page, to download it by hand.
+    Download(Version),
+    Install(Version),
+    /// Being installed: shown, but not chosen again.
+    Installing(Version),
+}
+
 /// What the menu shows.
 pub struct Model {
     pub lang: Lang,
@@ -28,8 +38,8 @@ pub struct Model {
     pub active: Option<Slot>,
     pub shows_overlay: bool,
     pub starts_with_windows: bool,
-    /// A newer release than this one, to download.
-    pub update: Option<Version>,
+    /// A newer release than this one.
+    pub update: Option<Offer>,
     /// The side of a badge, at the screen's scaling.
     pub badge_size: usize,
 }
@@ -39,6 +49,7 @@ pub struct Model {
 pub enum Choice {
     Activate(Slot),
     Download,
+    Install,
     OpenHub,
     ToggleOverlay,
     ToggleStartup,
@@ -51,6 +62,7 @@ const TOGGLE_OVERLAY: u32 = 201;
 const TOGGLE_STARTUP: u32 = 202;
 const EXIT: u32 = 203;
 const DOWNLOAD: u32 = 204;
+const INSTALL: u32 = 205;
 
 /// Shows the menu at `at` and waits for a choice; `None` if it closed without one.
 pub fn show(window: HWND, model: &Model, at: POINT) -> Option<Choice> {
@@ -69,6 +81,7 @@ pub fn show(window: HWND, model: &Model, at: POINT) -> Option<Choice> {
 fn choice(id: u32) -> Option<Choice> {
     match id {
         DOWNLOAD => Some(Choice::Download),
+        INSTALL => Some(Choice::Install),
         OPEN_HUB => Some(Choice::OpenHub),
         TOGGLE_OVERLAY => Some(Choice::ToggleOverlay),
         TOGGLE_STARTUP => Some(Choice::ToggleStartup),
@@ -117,8 +130,11 @@ impl Menu {
             }
         }
         menu.separator();
-        if let Some(version) = model.update {
-            menu.item(&lang.download(version), DOWNLOAD, 0);
+        match model.update {
+            Some(Offer::Download(version)) => menu.item(&lang.download(version), DOWNLOAD, 0),
+            Some(Offer::Install(version)) => menu.item(&lang.install(version), INSTALL, 0),
+            Some(Offer::Installing(version)) => menu.item(&lang.installing(version), 0, MF_GRAYED),
+            None => {}
         }
         menu.item(lang.open_hub(), OPEN_HUB, 0);
         menu.item(lang.show_overlay(), TOGGLE_OVERLAY, if model.shows_overlay { MF_CHECKED } else { 0 });
@@ -170,6 +186,7 @@ mod tests {
             assert_eq!(choice(slot_id(slot)), Some(Choice::Activate(slot)));
         }
         assert_eq!(choice(DOWNLOAD), Some(Choice::Download));
+        assert_eq!(choice(INSTALL), Some(Choice::Install));
         assert_eq!(choice(OPEN_HUB), Some(Choice::OpenHub));
         assert_eq!(choice(TOGGLE_OVERLAY), Some(Choice::ToggleOverlay));
         assert_eq!(choice(TOGGLE_STARTUP), Some(Choice::ToggleStartup));

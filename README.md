@@ -37,7 +37,8 @@ and back, with nothing to open, nothing to install, and nothing in the way of yo
 - **At home in Windows.** Sharp at any display scaling, dark when Windows is dark, usable from the
   keyboard, in English or Spanish (it follows Windows' language).
 - **Starts with Windows** if you want it to, with ATK HUB a click away.
-- **Tells you when there is a new version**, in its menu, with the download a click away.
+- **Updates itself when you ask.** When a new version is out, its menu offers it; one click
+  downloads it, checks that it is signed by Phantom Switch and restarts into it.
 
 ## Download
 
@@ -55,7 +56,7 @@ Set up your profiles in [ATK HUB](https://hub.atk.pro/) as usual; Phantom Switch
 | | |
 |---|---|
 | **Click** the icon | Back to the profile you used before; the first time, it alternates between 1 and 2. |
-| **Right-click** | The menu: connection and battery, the four profiles with what each one has, **Open ATK HUB**, **Show a notice when switching**, **Start with Windows** and **Exit**. When a new version is out, **Download version X.Y.Z** comes first among them. |
+| **Right-click** | The menu: connection and battery, the four profiles with what each one has, **Open ATK HUB**, **Show a notice when switching**, **Start with Windows** and **Exit**. When a new version is out, **Update to version X.Y.Z** comes first among them. |
 | **Keyboard** | <kbd>Win</kbd> + <kbd>B</kbd> reaches the tray; <kbd>Enter</kbd> switches and the menu key opens the menu. |
 
 The menu reads the mouse as it opens:
@@ -77,8 +78,12 @@ Wireless · battery 90%
 The active profile is read on the spot; the others show what they had the last time they were
 active.
 
-To update, download the new `PhantomSwitch.exe` and put it in place of the old one; your choices
-are kept.
+To update, choose **Update to version X.Y.Z** in the menu. Phantom Switch downloads the new
+`PhantomSwitch.exe` and its signature from the release, installs it only if the signature is
+Phantom Switch's own, and puts it in place of the old one, which it then restarts into; your
+choices are kept, and **Start with Windows** keeps working. If it cannot update itself there (in a
+folder it cannot write to, say), it opens the release's page: download the new
+`PhantomSwitch.exe` and put it in place of the old one.
 
 ## Light by design
 
@@ -92,7 +97,8 @@ Phantom Switch is built to go unnoticed.
   is plugged in or out, and, through the receiver, to check the battery every 15 minutes.
 - **It asks GitHub for the latest version once a day at most**: a single request for the number
   of the latest release, on a thread that ends with it (without a connection, it tries again an
-  hour later). Nothing else is sent, and nothing is downloaded or installed on its own.
+  hour later). Nothing else is sent, and nothing is downloaded until you choose to update; then
+  only a release signed with Phantom Switch's key is installed.
 - **It never touches your settings.** It reads, and its only write is the one ATK HUB makes to
   switch profiles. Each request is sent once, never two switches at a time, and the active profile
   is never rewritten.
@@ -121,7 +127,7 @@ and tested against real answers from the mouse:
 | `177` | The mouse's features |
 
 It is written in Rust; its one dependency is [`windows-sys`](https://crates.io/crates/windows-sys),
-the bindings to the Windows API:
+the bindings to the Windows API (an update's signature is checked with Windows' own cryptography):
 
 ```text
 src/
@@ -134,10 +140,11 @@ src/
 ├── badge.rs     the badge that stands for each profile
 ├── paint.rs     drawing: shapes, text, icons and bitmaps
 ├── settings.rs  what you choose, in the registry (registry.rs)
-├── update.rs    whether a new version is out
+├── update/      whether a new version is out, and installing it once its signature checks out
 └── …            texts in two languages, Windows' theme, Windows helpers
 assets/          the icon and manifest build.rs puts in the .exe, and the README's pictures
 tools/icon/      draws the icon
+tools/sign/      signs releases
 ```
 
 ## Building
@@ -155,9 +162,17 @@ The icon is drawn in code, in [`tools/icon`](tools/icon/src/main.rs): after chan
 `cargo run -p icon` (from Linux, add `--target x86_64-unknown-linux-gnu`) to write `assets/icon.ico`, `assets/icon.svg` and the illustration's icon again. CI checks they
 are up to date.
 
-Releases publish themselves: pushing a `vX.Y.Z` tag runs the tests, builds the app and uploads it
-to Releases with that version's section of the [changelog](CHANGELOG.md) as its notes. The app
-offers only stable releases: `0.x` tags are published as pre-releases, which it never offers.
+Releases publish themselves: pushing a `vX.Y.Z` tag runs the tests, builds the app, signs it and
+uploads it to Releases with its signature and that version's section of the
+[changelog](CHANGELOG.md) as its notes. The app offers only stable releases: `0.x` tags are
+published as pre-releases, which it never offers.
+
+The signature is ECDSA P-256, made by [`tools/sign`](tools/sign/src/main.rs) with the repository's
+secret `PHANTOM_SIGNING_KEY`; the app carries the public key, `assets/release-key.pub`, and installs
+nothing it does not verify. The key is made once, with `cargo run -p sign -- keygen > key.txt`
+(from Linux, add `--target x86_64-unknown-linux-gnu`): it writes the public key and prints the
+private one, to set as the secret and keep somewhere safe. Without it, the copies already
+installed can no longer update themselves.
 
 ## License
 

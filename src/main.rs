@@ -8,7 +8,8 @@
 //!
 //! It never listens to the mouse or the keyboard: it talks to the mouse once at start, when asked,
 //! when Windows says a device was plugged in or out, and, through the receiver, for the battery
-//! every 15 minutes. Once a day at most, `update` asks GitHub for the latest version's number.
+//! every 15 minutes. Once a day at most, `update` asks GitHub for the latest version's number;
+//! it downloads one only when the user chooses to update.
 
 #![windows_subsystem = "windows"]
 
@@ -34,10 +35,15 @@ mod win;
 mod worker;
 
 fn main() {
+    let updated = update::install::wait_for_previous();
     let Some(_instance) = win::SingleInstance::acquire(APP_ID) else {
-        win::message(strings::ui().already_running());
+        // Right after an update, the copy it replaced did not close: no message about it.
+        if !updated {
+            win::message(strings::ui().already_running());
+        }
         return;
     };
+    update::install::clean_up();
     theme::follow_system();
-    app::run();
+    app::run(updated);
 }

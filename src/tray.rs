@@ -5,8 +5,8 @@ use std::mem::{size_of, zeroed};
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::UI::HiDpi::{GetDpiForWindow, GetSystemMetricsForDpi};
 use windows_sys::Win32::UI::Shell::{
-    NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIIF_RESPECT_QUIET_TIME, NIIF_WARNING, NIM_ADD, NIM_DELETE,
-    NIM_MODIFY, NIM_SETVERSION, NOTIFYICON_VERSION_4, NOTIFYICONDATAW, Shell_NotifyIconW,
+    NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIIF_INFO, NIIF_RESPECT_QUIET_TIME, NIIF_WARNING, NIM_ADD,
+    NIM_DELETE, NIM_MODIFY, NIM_SETVERSION, NOTIFYICON_VERSION_4, NOTIFYICONDATAW, Shell_NotifyIconW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::SM_CXSMICON;
 
@@ -57,9 +57,17 @@ impl Tray {
     }
 
     pub fn warn(&self, title: &str, body: &str) {
+        self.notify(NIIF_WARNING, title, body);
+    }
+
+    pub fn tell(&self, title: &str, body: &str) {
+        self.notify(NIIF_INFO, title, body);
+    }
+
+    fn notify(&self, kind: u32, title: &str, body: &str) {
         let mut data = self.data();
         data.uFlags = NIF_INFO;
-        data.dwInfoFlags = NIIF_WARNING | NIIF_RESPECT_QUIET_TIME;
+        data.dwInfoFlags = kind | NIIF_RESPECT_QUIET_TIME;
         fill(&mut data.szInfoTitle, title);
         fill(&mut data.szInfo, body);
         // SAFETY: `data` is complete.

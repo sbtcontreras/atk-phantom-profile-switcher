@@ -1,7 +1,7 @@
 //! The interface: a hidden window that receives the tray icon's clicks, Windows' notices and the
 //! mouse thread's results, and what is known of the mouse to show it. It all lives on the
 //! interface's thread; with the mouse thread it only trades requests and results, and the check
-//! for a new version answers it the same way.
+//! for a new version and its install answer it the same way.
 
 use std::cell::{Cell, RefCell};
 use std::mem::zeroed;
@@ -18,10 +18,11 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 use crate::device::{Battery, Connection, Profile, Slot};
-use crate::menu::{self, Choice, Model};
+use crate::menu::{self, Choice, Model, Offer};
 use crate::overlay::Overlay;
 use crate::strings::{self, Lang};
 use crate::tray::Tray;
+use crate::update::install;
 use crate::update::{self, Answer, Version};
 use crate::win::{open_url, wide};
 use crate::worker::{self, Job, Outcome, Reply, Worker, back_from};
@@ -30,6 +31,7 @@ use crate::{APP_ID, APP_NAME, settings, theme};
 const WM_TRAY: u32 = WM_APP + 1;
 const WM_REPLY: u32 = WM_APP + 2;
 const WM_UPDATE: u32 = WM_APP + 3;
+const WM_INSTALLED: u32 = WM_APP + 4;
 /// Enter or Space on the icon.
 const NIN_KEYSELECT: u32 = NIN_SELECT | NINF_KEY;
 
@@ -49,8 +51,9 @@ thread_local! {
     static TASKBAR_CREATED: Cell<u32> = const { Cell::new(0) };
 }
 
-/// Creates the window and the icon, and handles messages until exit.
-pub fn run() {
+/// Creates the window and the icon, and handles messages until exit; `updated`, when this start
+/// follows an update.
+pub fn run(updated: bool) {
     // SAFETY: Win32 calls with NUL-terminated strings that live through each call.
     let window = unsafe {
         let instance = GetModuleHandleW(null());
@@ -70,7 +73,7 @@ pub fn run() {
         return;
     }
     APP.with_borrow_mut(|app| *app = Some(App::new(window)));
-    with_app(App::start);
+    with_app(|app| app.start(updated));
     // SAFETY: this thread's message loop.
     unsafe {
         let mut message: MSG = zeroed();
@@ -103,6 +106,9 @@ unsafe extern "system" fn window_proc(window: HWND, message: u32, wparam: WPARAM
         }
         WM_UPDATE => {
             with_app(|app| app.on_update(update::take_answer(wparam, lparam)));
+        }
+        WM_INSTALLED => {
+            with_app(|app| app.on_installed(install::take_outcome(wparam)));
         }
         WM_TIMER => {
             with_app(|app| app.on_timer(wparam));
@@ -149,6 +155,9 @@ fn show_menu(window: HWND) {
             with_app(|app| app.switch(Job::Activate(slot)));
         }
         Some(Choice::Download) => open_url(update::RELEASE_PAGE),
+        Some(Choice::Install) => {
+            with_app(App::install);
+        }
         Some(Choice::OpenHub) => open_url(HUB_URL),
         Some(Choice::ToggleOverlay) => settings::set_shows_overlay(!model.shows_overlay),
         Some(Choice::ToggleStartup) => settings::set_starts_with_windows(!model.starts_with_windows),
@@ -178,6 +187,15 @@ impl Mouse {
             Seen::Searching | Seen::NotFound | Seen::NoAnswer => None,
         }
     }
+}
+
+/// Where installing a new version stands.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Install {
+    Idle,
+    Busy,
+    /// In place: there is nothing more to offer until the app opens again.
+    Done,
 }
 
 #[derive(Default, Clone, Copy)]
@@ -212,6 +230,7 @@ struct App {
     checking: bool,
     /// When the last check could not ask, in seconds since 1970: the next one waits a while.
     check_failed: Option<u64>,
+    install: Install,
 }
 
 impl App {
@@ -231,11 +250,15 @@ impl App {
             latest: settings::latest_version(),
             checking: false,
             check_failed: None,
+            install: Install::Idle,
         }
     }
 
-    fn start(&mut self) {
+    fn start(&mut self, updated: bool) {
         self.show();
+        if updated {
+            self.tray.tell(self.lang.updated(), &self.lang.now_version(Version::current()));
+        }
         self.worker.send(Job::Refresh);
         // SAFETY: this window's timer.
         unsafe { SetTimer(self.window, TIMER_BATTERY, BATTERY_EVERY_MS, None) };
@@ -288,6 +311,42 @@ impl App {
             }
             Err(_) => self.check_failed = Some(update::now()),
         }
+    }
+
+    /// Installs the newer release the menu offers, on a thread of its own.
+    fn install(&mut self) {
+        if let (Install::Idle, Some(version)) = (self.install, self.newer()) {
+            self.install = Install::Busy;
+            install::in_background(self.window, WM_INSTALLED, version);
+        }
+    }
+
+    fn on_installed(&mut self, outcome: install::Outcome) {
+        let lang = self.lang;
+        self.install = Install::Idle;
+        match outcome {
+            install::Outcome::Restarting => {
+                self.install = Install::Done;
+                // The new copy takes the tray once this one closes.
+                // SAFETY: closes the window from the message loop, not from here.
+                unsafe { PostMessageW(self.window, WM_CLOSE, 0, 0) };
+            }
+            install::Outcome::Installed => {
+                self.install = Install::Done;
+                self.tray.tell(lang.updated(), lang.next_time());
+            }
+            install::Outcome::Unreachable => self.tray.warn(lang.update_failed(), lang.update_unreachable()),
+            install::Outcome::NotAuthentic => self.tray.warn(lang.update_failed(), lang.update_not_authentic()),
+            install::Outcome::ByHand => {
+                open_url(update::RELEASE_PAGE);
+                self.tray.warn(lang.update_failed(), lang.update_by_hand());
+            }
+        }
+    }
+
+    /// The latest release known, when it is newer than this one.
+    fn newer(&self) -> Option<Version> {
+        self.latest.filter(|latest| latest.is_newer())
     }
 
     fn kill_timer(&self, timer: usize) {
@@ -387,7 +446,12 @@ impl App {
             active: mouse.slot(),
             shows_overlay: settings::shows_overlay(),
             starts_with_windows: settings::starts_with_windows(),
-            update: self.latest.filter(|latest| latest.is_newer()),
+            update: self.newer().and_then(|version| match self.install {
+                Install::Idle if install::can_install() => Some(Offer::Install(version)),
+                Install::Idle => Some(Offer::Download(version)),
+                Install::Busy => Some(Offer::Installing(version)),
+                Install::Done => None,
+            }),
             badge_size: self.tray.icon_size(),
         }
     }

@@ -74,6 +74,63 @@ impl Lang {
         }
     }
 
+    pub fn install(self, version: Version) -> String {
+        match self {
+            Lang::Spanish => format!("Actualizar a la versión {version}"),
+            Lang::English => format!("Update to version {version}"),
+        }
+    }
+
+    pub fn installing(self, version: Version) -> String {
+        match self {
+            Lang::Spanish => format!("Actualizando a la versión {version}…"),
+            Lang::English => format!("Updating to version {version}…"),
+        }
+    }
+
+    pub fn updated(self) -> &'static str {
+        self.pick("Phantom Switch se actualizó", "Phantom Switch was updated")
+    }
+
+    pub fn now_version(self, version: Version) -> String {
+        match self {
+            Lang::Spanish => format!("Ahora tienes la versión {version}."),
+            Lang::English => format!("You now have version {version}."),
+        }
+    }
+
+    pub fn next_time(self) -> &'static str {
+        self.pick(
+            "La versión nueva se usará la próxima vez que lo abras.",
+            "The new version will run the next time you open it.",
+        )
+    }
+
+    pub fn update_failed(self) -> &'static str {
+        self.pick("No se pudo actualizar", "Couldn't update")
+    }
+
+    pub fn update_unreachable(self) -> &'static str {
+        self.pick(
+            "No se pudo descargar la versión nueva. Inténtalo más tarde.",
+            "Couldn't download the new version. Try again later.",
+        )
+    }
+
+    pub fn update_not_authentic(self) -> &'static str {
+        self.pick(
+            "La descarga no venía firmada por Phantom Switch, así que no se instaló nada.",
+            "The download wasn't signed by Phantom Switch, so nothing was installed.",
+        )
+    }
+
+    pub fn update_by_hand(self) -> &'static str {
+        self.pick(
+            "No se puede actualizar desde aquí: descárgala en la página que se abrió.",
+            "It can't update itself here: download it from the page that opened.",
+        )
+    }
+
     pub fn exit(self) -> &'static str {
         self.pick("Salir", "Exit")
     }

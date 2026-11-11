@@ -1,34 +1,23 @@
-//! Whether a newer Phantom Switch is out. It asks GitHub where the latest release's page leads:
-//! one `HEAD` request, whose answer is a redirect to `…/releases/tag/vX.Y.Z`, read without
-//! following it. Nothing is downloaded or installed, and nothing is sent but the request itself;
-//! the menu offers the release's page to download it by hand.
+//! Whether a newer Phantom Switch is out, and installing it.
+//!
+//! The check asks GitHub where the latest release's page leads: one `HEAD` request, whose answer
+//! is a redirect to `…/releases/tag/vX.Y.Z`, read without following it. Nothing is sent but the
+//! request itself, and nothing is downloaded until the user chooses to update (`install`).
 //!
 //! `releases/latest` leads only to stable releases: pre-releases are never offered.
 
-use std::ffi::c_void;
+mod http;
+pub mod install;
+mod signature;
+
 use std::fmt;
-use std::mem::size_of;
-use std::ptr::{null, null_mut};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use windows_sys::Win32::Foundation::HWND;
-use windows_sys::Win32::Networking::WinHttp::{
-    INTERNET_DEFAULT_HTTPS_PORT, WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_DISABLE_COOKIES,
-    WINHTTP_DISABLE_REDIRECTS, WINHTTP_FLAG_SECURE, WINHTTP_OPTION_DISABLE_FEATURE, WINHTTP_QUERY_FLAG_NUMBER,
-    WINHTTP_QUERY_LOCATION, WINHTTP_QUERY_STATUS_CODE, WinHttpCloseHandle, WinHttpConnect, WinHttpOpen,
-    WinHttpOpenRequest, WinHttpQueryHeaders, WinHttpReceiveResponse, WinHttpSendRequest, WinHttpSetOption,
-    WinHttpSetTimeouts,
-};
 use windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW;
 
-use crate::APP_ID;
-use crate::win::wide;
-
-/// The latest release's page, where the menu leads.
+/// The latest release's page, where the menu leads when the app cannot update itself.
 pub const RELEASE_PAGE: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/releases/latest");
-const SITE: &str = "https://github.com";
-/// How long a check waits for each step (finding GitHub, connecting, its answer).
-const TIMEOUT_MS: i32 = 15_000;
 /// At most one check a day.
 const CHECK_EVERY_SECS: u64 = 24 * 60 * 60;
 /// After a check that could not ask (no connection yet, say, right after signing in), the next
@@ -123,58 +112,7 @@ pub fn take_answer(wparam: usize, lparam: isize) -> Answer {
 
 /// Asks GitHub for the latest release; it waits for the answer.
 fn latest() -> Answer {
-    let path = RELEASE_PAGE.strip_prefix(SITE).ok_or(Unreachable)?;
-    let host = SITE.trim_start_matches("https://");
-    let agent = wide(&format!("{APP_ID}/{}", Version::current()));
-    // SAFETY: NUL-terminated strings that live through each call; each handle goes into a
-    // `Handle`, closed when dropped (the request before the connection before the session).
-    unsafe {
-        let session = Handle::new(WinHttpOpen(agent.as_ptr(), WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, null(), null(), 0))?;
-        WinHttpSetTimeouts(session.0, TIMEOUT_MS, TIMEOUT_MS, TIMEOUT_MS, TIMEOUT_MS);
-        let connection = Handle::new(WinHttpConnect(session.0, wide(host).as_ptr(), INTERNET_DEFAULT_HTTPS_PORT, 0))?;
-        let request = Handle::new(WinHttpOpenRequest(
-            connection.0,
-            wide("HEAD").as_ptr(),
-            wide(path).as_ptr(),
-            null(),
-            null(),
-            null(),
-            WINHTTP_FLAG_SECURE,
-        ))?;
-        // The redirect is the answer: it is read, not followed.
-        let features: u32 = WINHTTP_DISABLE_REDIRECTS | WINHTTP_DISABLE_COOKIES;
-        WinHttpSetOption(request.0, WINHTTP_OPTION_DISABLE_FEATURE, (&raw const features).cast(), 4);
-        if WinHttpSendRequest(request.0, null(), 0, null(), 0, 0, 0) == 0
-            || WinHttpReceiveResponse(request.0, null_mut()) == 0
-        {
-            return Err(Unreachable);
-        }
-        let mut status = 0u32;
-        let mut size = size_of::<u32>() as u32;
-        let flags = WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER;
-        if WinHttpQueryHeaders(request.0, flags, null(), (&raw mut status).cast(), &mut size, null_mut()) == 0 {
-            return Err(Unreachable);
-        }
-        // GitHub answered: anything but a redirect means there is nothing to offer.
-        if !(300..400).contains(&status) {
-            return Ok(None);
-        }
-        let mut location = [0u16; 512];
-        let mut size = size_of_val(&location) as u32;
-        let read = WinHttpQueryHeaders(
-            request.0,
-            WINHTTP_QUERY_LOCATION,
-            null(),
-            location.as_mut_ptr().cast(),
-            &mut size,
-            null_mut(),
-        );
-        if read == 0 {
-            return Ok(None);
-        }
-        let units = (size as usize / 2).min(location.len());
-        Ok(version_in(&String::from_utf16_lossy(&location[..units])))
-    }
+    Ok(http::redirect(RELEASE_PAGE)?.as_deref().and_then(version_in))
 }
 
 /// The version of a release's page; without a stable release, `releases/latest` leads to the
@@ -183,24 +121,9 @@ fn version_in(location: &str) -> Option<Version> {
     Version::parse(location.rsplit_once("/releases/tag/")?.1)
 }
 
-/// A WinHTTP handle, closed when dropped.
-struct Handle(*mut c_void);
-
-impl Handle {
-    fn new(handle: *mut c_void) -> Result<Handle, Unreachable> {
-        if handle.is_null() { Err(Unreachable) } else { Ok(Handle(handle)) }
-    }
-}
-
-impl Drop for Handle {
-    fn drop(&mut self) {
-        // SAFETY: a handle WinHTTP opened, closed once.
-        unsafe { WinHttpCloseHandle(self.0) };
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use super::http::SITE;
     use super::*;
 
     #[test]

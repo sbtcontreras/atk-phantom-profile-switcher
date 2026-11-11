@@ -1,6 +1,6 @@
 [package]
 name = "atk-phantom-profile-switcher"
-version = "1.0.0"
+version = "1.1.0"
 description = "Phantom Switch: switch the ATK Phantom Ultimate's onboard profiles from the Windows tray."
 repository = "https://github.com/sbtcontreras/atk-phantom-profile-switcher"
 edition.workspace = true
@@ -20,6 +20,7 @@ windows-sys = { version = "0.61", features = [
   "Win32_Graphics_Gdi",
   "Win32_Networking_WinHttp",
   "Win32_Security",
+  "Win32_Security_Cryptography",
   "Win32_Storage_FileSystem",
   "Win32_System_IO",
   "Win32_System_LibraryLoader",
@@ -37,7 +38,7 @@ embed-resource = "3"
 workspace = true
 
 [workspace]
-members = ["tools/icon"]
+members = ["tools/icon", "tools/sign"]
 
 [workspace.package]
 edition = "2024"
